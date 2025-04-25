@@ -45,7 +45,7 @@ def create_gdf_fireEvents(fireEvents):
 ####################################################
 def init(config_name):
     script_dir = Path(__file__).resolve().parent
-    params = hstools.load_config(str(script_dir)+f'/config-{config_name}.yaml')
+    params = hstools.load_config(str(script_dir)+f'/../config/config-{config_name}.yaml')
 
     os.makedirs(params['event']['dir_data'],exist_ok=True)
 
@@ -479,10 +479,15 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
         event.save( 'past', params)
 
     print('number of events saved:')
-    print('    active: {:d}'.format(len(fireEvents)))
+    print('    active: {:d}'.format(count_not_none(fireEvents)))
     print('    past  : {:d}'.format(len(pastFireEvents)))
 
     return end_datetime, fireEvents, pastFireEvents
+
+
+###############################################
+def count_not_none(lst):
+    return sum(1 for item in lst if item is not None)
 
 
 ###############################################
