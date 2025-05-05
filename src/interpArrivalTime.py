@@ -33,8 +33,8 @@ import xarray as xr
 
 #homebrewed
 src_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(src_dir+'../src_extra/RuningAverageImage/')
-sys.path.append(src_dir+'../src_extra/Factor_number/')
+sys.path.append(src_dir+'/../src_extra/RuningAverageImage/')
+sys.path.append(src_dir+'/../src_extra/Factor_number/')
 import runingNeighbourImage
 import factor 
 import tools as map_tools

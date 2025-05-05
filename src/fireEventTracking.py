@@ -51,6 +51,10 @@ def init(config_name):
     if socket.gethostname() == 'moritz': 
         params['hs']['dir_data'] = params['hs']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
         params['event']['dir_data'] = params['event']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
+    
+    if socket.gethostname() == 'pc70852': 
+        params['hs']['dir_data'] = params['hs']['dir_data'].replace('/mnt/data3/','/home/paugam/')
+        params['event']['dir_data'] = params['event']['dir_data'].replace('/mnt/data3/','/home/paugam/')
 
     os.makedirs(params['event']['dir_data'],exist_ok=True)
     if 'dir_geoJson' in params['event'].keys():
@@ -611,10 +615,11 @@ if __name__ == '__main__':
     #start = datetime.strptime('2025-04-12_0000', '%Y-%m-%d_%H%M')
     #end = datetime.strptime('2025-04-15_0000', '%Y-%m-%d_%H%M')
     
-    #params = init('AVEIRO') 
-    #start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
-    #end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
+    params = init('AVEIRO') 
+    start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
+    end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
     
+    '''
     params = init('SILEX')
     if os.path.isfile(src_dir+'/timeControl.txt'): 
         with open(src_dir+'/timeControl.txt','w') as f:
@@ -623,6 +628,8 @@ if __name__ == '__main__':
         start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
     
     end = datetime.now(timezone.utc)
+    '''
+
     #end = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
     
     #start = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
