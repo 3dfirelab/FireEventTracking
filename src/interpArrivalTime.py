@@ -541,7 +541,7 @@ def interpolate_fire_spread_between_ff(idx_contour, mask_nodata, arrivalTime_fil
         while p<.99:
             ros_max_new = ros_scale[i]
             idx = np.where(ros_scale<=ros_max_new)
-            p = np.trapezoid(ros_pdf[idx],ros_scale[idx])
+            p = np.trapz(ros_pdf[idx],ros_scale[idx])
             i+=1
 
             if i == len(ros_scale):
@@ -850,6 +850,15 @@ def interpolate_arrivalTime(out_dir, maps_fire, crs,                            
             mask_ff = np.zeros_like(arrivalTime_fillup)
             mask_ff[idx_mask_ff] = 1
 
+            fig = plt.figure(figsize=(12,5))
+            ax = plt.subplot(131)
+            ax.imshow(np.ma.masked_where((arrivalTime_fillup>time) | (arrivalTime_fillup<0), arrivalTime_fillup).T, origin='lower')
+            ax = plt.subplot(132)
+            ax.imshow(mask.T, origin='lower')
+            ax = plt.subplot(133)
+            ax.imshow(mask_ff.T, origin='lower')
+            plt.show()
+
             idx = np.where((mask_ff==1)&(arrivalTime_clean<0))
             arrivalTime_clean[idx] = arrivalTime_fillup[idx]
         
@@ -1032,21 +1041,24 @@ def interpolate_arrivalTime(out_dir, maps_fire, crs,                            
             nbre_contours = len(contours)
             mm = np.zeros_like(arrivalTime_clean)
             size_contour = []
-            
+           
+            mask_all_fsrun = np.zeros_like(arrivalTime_clean)
+
             for ic in range(nbre_contours):
                 if ('node' not in socket.gethostname()): 
                     print('  select contours: {:05.2f}% ...\r'.format(100.*ic/nbre_contours), end=' ') 
                     sys.stdout.flush()
                 if hierarchy[0,ic,3] == -1: 
                 #    if (flag_stop) & (mm[iii,jjj] > 0): pdb.set_trace()
+                    print(ic)
                     continue                                    # outermost contour
                 
                 idx_contour = [contours[ic][:,0,1],contours[ic][:,0,0]]
 
-                #plt.imshow(arrivalTime_clean.T,origin='lower',interpolation='nearest')
-                #plt.scatter(idx_contour[0],idx_contour[1],c='w')
-                #plt.show()
-                #pdb.set_trace()
+                plt.imshow(arrivalTime_clean.T,origin='lower',interpolation='nearest')
+                plt.scatter(idx_contour[0],idx_contour[1],c='w')
+                plt.show()
+                pdb.set_trace()
 
                 ichilds = np.where(hierarchy[0,:,3] == ic)
                 idx_childs = []
@@ -1077,7 +1089,7 @@ def interpolate_arrivalTime(out_dir, maps_fire, crs,                            
                     '''
                 idx_inside = np.where(mask_inside==1)
 
-                if idx_inside[0].shape[0] <= 4:  # drop contour with less than 4 pixels inside
+                if idx_inside[0].shape[0] <= 1:  # drop contour with less than 4 pixels inside
                     continue
                 
                 #plt.imshow(mask_inside.T,origin='lower',interpolation='nearest')
@@ -1261,6 +1273,12 @@ def interpolate_arrivalTime(out_dir, maps_fire, crs,                            
                     
                 argsStar.append( [idx_contour, mask_inside, arrivalTime_fillup, arrivalTime_clean, idx_mesh, resolution, time_reso, ros_max, False, ic])
                 size_contour.append(np.where(mask_inside==1)[0].shape[0]) 
+                
+                mask_all_fsrun[np.where(mask_inside==1)] = ic
+
+            plt.imshow(np.ma.masked_where(mask_all_fsrun==0,mask_all_fsrun).T, origin='lower')
+            plt.show()
+            pdb.set_trace()
             nx,ny =  arrivalTime_fillup.shape
             #draw contour
             '''

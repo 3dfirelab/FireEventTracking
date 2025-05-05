@@ -238,7 +238,8 @@ def loopFireEvents(params, currentTime):
         
         if fireEvent is None: continue
    
-        if len(fireEvent.times)> 3:
+        #if len(fireEvent.times)> 3:
+        if fireEvent.id_fire_event == 313 :
     
             out_dir_event = '{:s}/Pickles_{:s}_{:s}/{:09d}/'.format(params['event']['dir_data'],'active',
                                                              currentTime.strftime("%Y-%m-%d_%H%M"),fireEvent.id_fire_event)
@@ -345,7 +346,7 @@ def loopFireEvents(params, currentTime):
             params_interp['ros_max'] = 10. 
             params_interp['flag_use_time_reso_constraint'] = False
             params_interp['interpolate_betwee_ff'] = 'fsrbf'
-            params_interp['distance_interaction_rbf'] = 200.
+            params_interp['distance_interaction_rbf'] = 50.
             arrivalTime_interp, arrivalTime_FS, arrivalTime_clean = \
                                 interpArrivalTime.interpolate_arrivalTime(              \
                                 out_dir_event, maps_fire, pyproj.CRS.from_epsg(params['general']['crs']),           \

@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     #init
     params = fireEventTracking.init('AVEIRO') 
-    currentTime = datetime.strptime('2024-09-17_2000', '%Y-%m-%d_%H%M')
+    currentTime = datetime.strptime('2024-09-20_2100', '%Y-%m-%d_%H%M')
     
     #loop
     fireEvent.loopFireEvents(params, currentTime )

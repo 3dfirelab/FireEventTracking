@@ -20,6 +20,7 @@ import warnings
 import pickle
 import shutil
 import glob
+import socket
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
 #home brewed
@@ -46,8 +47,13 @@ def create_gdf_fireEvents(fireEvents):
 def init(config_name):
     script_dir = Path(__file__).resolve().parent
     params = hstools.load_config(str(script_dir)+f'/../config/config-{config_name}.yaml')
+    
+    if socket.gethostname() == 'moritz': 
+        params['hs']['dir_data'] = params['hs']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
+        params['event']['dir_data'] = params['event']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
 
     os.makedirs(params['event']['dir_data'],exist_ok=True)
+    
 
     return params
   
@@ -127,7 +133,11 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
                 print('find duplicate hotspot in new entry')
                 pdb.set_trace()
             hsgdf.index = range(hsgdf_all_raw.index.max() + 1, hsgdf_all_raw.index.max() + 1 + len(hsgdf))
-            hsgdf_all_raw = pd.concat([hsgdf_all_raw.assign(version=hsgdf_all_raw['version'].astype(str)),hsgdf.assign(version=hsgdf_all_raw['version'].astype(str))])
+            try:
+                hsgdf_all_raw = pd.concat([hsgdf_all_raw.assign(version=hsgdf_all_raw['version'].astype(str)),hsgdf.assign(version=hsgdf_all_raw['version'].astype(str))])
+            except: 
+                pdb.set_trace()
+            
             #try:
             #    hsgdf_all_raw = hsgdf_all_raw.drop(index=19604)
             #except: 
@@ -467,9 +477,8 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
    
     if len(fireEvents)>0:
         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-        gdf_activeEvent.to_file("{:s}/firEvents-{:s}.gpkg".format(params['event']['dir_data'],end_datetime.strftime("%Y-%m-%d_%H%M")), driver="GPKG")
-
-        hsgdf_all_raw.to_file("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'],end_datetime.strftime("%Y-%m-%d_%H%M")), driver="GPKG")
+        gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents')
+        gdf_to_gpkgfile(hsgdf_all_raw, params, end_datetime, 'hotspots')
 
     for id_, event in enumerate(fireEvents):
         if event is not None: 
@@ -484,6 +493,17 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
 
     return end_datetime, fireEvents, pastFireEvents
 
+##############################################
+def gdf_to_gpkgfile(gdf_activeEvent, params, datetime_, name_):
+    tmp_path = "./{}-{}.gpkg".format(name_, datetime_.strftime("%Y-%m-%d_%H%M"))
+    try:
+        gdf_activeEvent.to_file(tmp_path, driver="GPKG")
+    except: 
+        pdb.set_trace()
+    # Move to mounted share
+    dst_path = os.path.join(params['event']['dir_data'], os.path.basename(tmp_path))
+    shutil.move(tmp_path, dst_path)
+    return None
 
 ###############################################
 def count_not_none(lst):
@@ -574,9 +594,15 @@ if __name__ == '__main__':
     #start = datetime.strptime('2025-04-12_0000', '%Y-%m-%d_%H%M')
     #end = datetime.strptime('2025-04-15_0000', '%Y-%m-%d_%H%M')
     
-    params = init('AVEIRO') 
-    start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
-    end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
+    #params = init('AVEIRO') 
+    #start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
+    #end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
+    
+    params = init('SILEX') 
+    start = datetime.strptime('2025-05-01_0000', '%Y-%m-%d_%H%M')
+    end = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
+    #start = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
+    #end = datetime.strptime('2025-05-02_2300', '%Y-%m-%d_%H%M')
 
     # Loop hourly
     current = start
