@@ -53,6 +53,8 @@ def init(config_name):
         params['event']['dir_data'] = params['event']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
 
     os.makedirs(params['event']['dir_data'],exist_ok=True)
+    if 'dir_geoJson' in params['event'].keys():
+        os.makedirs(params['event']['dir_geoJson'],exist_ok=True)
     
 
     return params
@@ -143,7 +145,6 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
             #except: 
             #    pass
 
-
         hsgdf_all = hsgdf_all_raw.copy()
         # Use DBSCAN for spatial clustering (define 1000 meters as the spatial threshold)
         # DBSCAN requires the distance in degrees, so you might need to convert meters to degrees.
@@ -197,8 +198,10 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
         fireCluster = gpd.GeoDataFrame(fireCluster, geometry=geometry)
         fireCluster = fireCluster.set_crs(params['general']['crs'])
         
-        fireCluster = fireCluster.to_crs(params['general']['crs'])
-    
+        #fireCluster = fireCluster.to_crs(params['general']['crs'])
+        #fireCluster.plot()
+        #plt.show()
+        #pdb.set_trace()
 
         # Store alpha shape geometries here
         alpha_shapes = []
@@ -241,16 +244,18 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
         else: 
             print(' append to fireEvents')
             gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-            
+           
             #here we go over each cluster and assign it to an existing event if its center is inside an active fire event. if not, this is a new one
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
                
-                if cluster.end_time < date_now: 
-                    continue
+                #pdb.set_trace()
+                #if cluster.end_time < date_now: 
+                #    continue
 
                 #if cluster.global_fire_event in gdf_activeEvent['global_fire_event']: continue
                    
                 if (ctr.geometry.geom_type == 'Polygon') :
+                    
 
                     #flag_found_matchingEvent = False
                     #for polygon in active fire event
@@ -264,6 +269,9 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
                     active_points_inside_cluster = gdf_linepoints[gdf_linepoints.geometry.apply(lambda point: cluster_polygons_.iloc[0].contains(point))].copy()
 
                     active_pp_matching_cluster = pd.concat([active_poly_inside_cluster,active_points_inside_cluster])
+
+                    #print('########')
+                    #print(len(active_pp_matching_cluster))
 
                     if len(active_pp_matching_cluster)==1:
                         idx_event = active_pp_matching_cluster.index[0]
@@ -450,6 +458,7 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
                 #if 19604 in cluster.indices_hs: pdb.set_trace()
                 #if 14634 in cluster.indices_hs: pdb.set_trace()
                 #if cluster.frp in gdf_activeEvent['frp'].values: pdb.set_trace()
+                #print('????????????????? new event')
                 new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw) 
                 fireEvents.append(new_event)
             
@@ -478,6 +487,7 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
     if len(fireEvents)>0:
         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
         gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents')
+        gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, end_datetime, 'firEvents')
         gdf_to_gpkgfile(hsgdf_all_raw, params, end_datetime, 'hotspots')
 
     for id_, event in enumerate(fireEvents):
@@ -496,12 +506,18 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
 ##############################################
 def gdf_to_gpkgfile(gdf_activeEvent, params, datetime_, name_):
     tmp_path = "./{}-{}.gpkg".format(name_, datetime_.strftime("%Y-%m-%d_%H%M"))
-    try:
-        gdf_activeEvent.to_file(tmp_path, driver="GPKG")
-    except: 
-        pdb.set_trace()
+    gdf_activeEvent.to_file(tmp_path, driver="GPKG")
     # Move to mounted share
     dst_path = os.path.join(params['event']['dir_data'], os.path.basename(tmp_path))
+    shutil.move(tmp_path, dst_path)
+    return None
+
+##############################################
+def gdf_to_geojson(gdf_activeEvent, params, datetime_, name_):
+    tmp_path = "./{}-{}.geojson".format(name_, datetime_.strftime("%Y-%m-%d_%H%M"))
+    gdf_activeEvent.to_file(tmp_path, driver="GeoJSON")
+    # Move to mounted share
+    dst_path = os.path.join(params['event']['dir_geoJson'], os.path.basename(tmp_path))
     shutil.move(tmp_path, dst_path)
     return None
 
@@ -588,6 +604,7 @@ if __name__ == '__main__':
     domain: -10,35,20,46
     '''
     importlib.reload(hstools)
+    src_dir = os.path.dirname(os.path.abspath(__file__))
    
     #init dir
     #params = init('202504') 
@@ -598,14 +615,27 @@ if __name__ == '__main__':
     #start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
     #end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
     
-    params = init('SILEX') 
-    start = datetime.strptime('2025-05-01_0000', '%Y-%m-%d_%H%M')
-    end = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
+    params = init('SILEX')
+    if os.path.isfile(src_dir+'/timeControl.txt'): 
+        with open(src_dir+'/timeControl.txt','w') as f:
+            start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+    else:
+        start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+    
+    end = datetime.now(timezone.utc)
+    #end = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
+    
     #start = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
     #end = datetime.strptime('2025-05-02_2300', '%Y-%m-%d_%H%M')
+    
+    print('########times#########')
+    print(start)
+    print(end)
+    print('######################')
 
     # Loop hourly
     current = start
+    end_time = None
     while current <= end:
 
         #get last time processed
@@ -623,9 +653,10 @@ if __name__ == '__main__':
             #ploting
             plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=False, flag_remove_singleHs=True)
 
+        end_time = current  
         #control hourly loop
         current += timedelta(hours=1)
 
-
-    
+    with open(src_dir+'/timeControl.txt','w') as f:
+        f.write(end_time.strftime('%Y-%m-%d_%H%M'))
 

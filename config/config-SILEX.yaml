@@ -8,4 +8,5 @@ hs:
   sats: ['VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT', 'VIIRS_SNPP_NRT']
 event:
   dir_data: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents
-
+  dir_geoJson: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/GeoJson
+  start_time: '2025-05-01_0000'

@@ -32,8 +32,9 @@ from shapely.geometry import LineString, Point, MultiPoint
 import xarray as xr 
 
 #homebrewed
-sys.path.append('../src_extra/RuningAverageImage/')
-sys.path.append('../src_extra/Factor_number/')
+src_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(src_dir+'../src_extra/RuningAverageImage/')
+sys.path.append(src_dir+'../src_extra/Factor_number/')
 import runingNeighbourImage
 import factor 
 import tools as map_tools
