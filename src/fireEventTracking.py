@@ -21,6 +21,8 @@ import pickle
 import shutil
 import glob
 import socket
+import argparse
+
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
 #home brewed
@@ -609,26 +611,43 @@ if __name__ == '__main__':
     '''
     importlib.reload(hstools)
     src_dir = os.path.dirname(os.path.abspath(__file__))
+  
+    parser = argparse.ArgumentParser(description="fireEventTracking")
+    parser.add_argument("--inputName", type=str, help="name of the configuration input", )
+    parser.add_argument("--log_dir", type=str, help="Directory for logs", default='/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/')
+
+    args = parser.parse_args()
+
+    inputName = args.inputName
+    log_dir = args.log_dir
    
+    #log_dir = sys.argv[2]
+    #inputName = sys.argv[1]
+
     #init dir
-    #params = init('202504') 
-    #start = datetime.strptime('2025-04-12_0000', '%Y-%m-%d_%H%M')
-    #end = datetime.strptime('2025-04-15_0000', '%Y-%m-%d_%H%M')
+    if inputName == '202504': 
+        params = init('202504') 
+        start = datetime.strptime('2025-04-12_0000', '%Y-%m-%d_%H%M')
+        end = datetime.strptime('2025-04-15_0000', '%Y-%m-%d_%H%M')
     
-    params = init('AVEIRO') 
-    start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
-    end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
+    elif inputName == 'AVEIRO': 
+        params = init('AVEIRO') 
+        start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
+        end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
     
-    '''
-    params = init('SILEX')
-    if os.path.isfile(src_dir+'/timeControl.txt'): 
-        with open(src_dir+'/timeControl.txt','w') as f:
-            start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+    elif inputName == 'SILEX': 
+        params = init('SILEX')
+        if os.path.isfile(log_dir+'/timeControl.txt'): 
+            with open(log_dir+'/timeControl.txt','r') as f:
+                start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        else:
+            start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        
+        end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+  
     else:
-        start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
-    
-    end = datetime.now(timezone.utc)
-    '''
+        print('missing inputName')
+        sys.exit()
 
     #end = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
     
@@ -664,6 +683,6 @@ if __name__ == '__main__':
         #control hourly loop
         current += timedelta(hours=1)
 
-    with open(src_dir+'/timeControl.txt','w') as f:
+    with open(log_dir+'/timeControl.txt','w') as f:
         f.write(end_time.strftime('%Y-%m-%d_%H%M'))
 

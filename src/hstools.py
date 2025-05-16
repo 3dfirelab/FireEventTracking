@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
+from pandas.errors import EmptyDataError
+
 #############################
 def load_config(path: str):
     with open(path, 'r') as file:
@@ -65,7 +67,10 @@ def load_hs4lastObsAllSat(day,hour,params):
     for satname in params['hs']['sats']:
         hsfiles = glob.glob('{:s}/{:s}/*{:s}-{:s}.csv'.format(params['hs']['dir_data'],satname,str(day),hour))
         if len(hsfiles)==1: 
-            df_ = pd.read_csv(hsfiles[0], delimiter=',', header=0)
+            try:
+                df_ = pd.read_csv(hsfiles[0], delimiter=',', header=0)
+            except EmptyDataError: 
+                continue
             if len(df_) == 0 : continue
             if df is None: 
                 df = df_
@@ -106,9 +111,11 @@ def load_hs4lastObsAllSat(day,hour,params):
 
     # Create GeoDataFrame
     gdf = gpd.GeoDataFrame(df, geometry=geometry)
-    
+   
+    gdf = gdf.dropna(subset=["acq_time"])
+
     # Combine and convert to datetime
-    gdf["timestamp"] = pd.to_datetime(gdf["acq_date"] + " " + gdf["acq_time"].astype(str).str.zfill(4), format="%Y-%m-%d %H%M")
+    gdf["timestamp"] = pd.to_datetime(gdf["acq_date"] + " " + gdf["acq_time"].astype(int).astype(str).str.zfill(4), format="%Y-%m-%d %H%M")
 
     # Set the coordinate reference system (CRS), assuming WGS84 (EPSG:4326)
     gdf.set_crs(epsg=4326, inplace=True)
