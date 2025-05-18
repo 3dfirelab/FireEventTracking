@@ -30,8 +30,6 @@ FET generates the fire event tracking data in `config['event']['dir_data']`
 ```
 .
 ├── Fig/
-├── firEvents-2025-05-01_0400.gpkg
-├── .... 
 ── GeoJson/
 │   ├── firEvents-2025-05-01_0400.geojson
 │   ├── ... 
@@ -42,11 +40,26 @@ FET generates the fire event tracking data in `config['event']['dir_data']`
 │   ├── fireEventTracking.log
 │   └── timeControl.txt
 ├── Pickles_active_2025-05-01_0400/
-├── ... 
+Pickles_active_2025-05-01_0400/
+│   ├── 000002687.pkl
+|   ├── ... 
+|   └── 000002766.pkl
 └── Pickles_past/
     ├── 000002687_2025-05-04_0052.pkl
-    ├── ....
+    └── ... 
 ```
+Hotspot are clustered using the following rules:
+- the spatial clustering is done with DBSCAN using `800`m (2x VIIRS resolution) as a max distance between sample. 
+```
+        db = DBSCAN(eps=epsilon, min_samples=1, metric='euclidean').fit(np.array(hsgdf_all[['x','y' ]]))
+```
+- 7 days life time for each hotspot
+- event is considered off if not update within 2 days.
+
+Each event has a unique `id={:09d}.format()`. Info for each event are stored in Pickle format. At every hour of a run, info of the active event are stored in `Pickles_active_{current_date}/`. One off the pickle is move to the directory `Pickles_past`. At every hour, all active fire event are also saved for the whole domain in `GeoJson/firEvents-{current_date}.geojson`.
+
+`Fig/` directory stores png images made every day at 20h00 for the last days only, no history is kept.
+
 
 
 # ROS

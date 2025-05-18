@@ -492,7 +492,7 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
    
     if len(fireEvents)>0:
         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-        gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents')
+        #gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents') #redondant with geojson below
         gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, end_datetime, 'firEvents')
         gdf_to_gpkgfile(hsgdf_all_raw, params, end_datetime, 'hotspots')
 
