@@ -49,8 +49,12 @@ FET generates the fire event tracking data in `config['event']['dir_data']`
 
 
 # ROS
+Calculation of ROS is available in `src/loopFireEvents.py`.
+this is still in dev.
 
-### requirement:
+# requirement
+```
 sudo apt install gdal-bin
 sudo apt install texlive-latex-base texlive-latex-extra
 sudo apt install cm-super
+```
