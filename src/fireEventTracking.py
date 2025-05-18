@@ -520,7 +520,11 @@ def gdf_to_gpkgfile(gdf_activeEvent, params, datetime_, name_):
 
 ##############################################
 def gdf_to_geojson(gdf_activeEvent, params, datetime_, name_):
-    tmp_path = "./{}-{}.geojson".format(name_, datetime_.strftime("%Y-%m-%d_%H%M"))
+    tmp_path = "./{:s}-{:s}.geojson".format(name_, datetime_.strftime("%Y-%m-%d_%H%M"))
+    #set time attribute to time of the fire event and time_obs to the time of the last obs
+    gdf_activeEvent = gdf_activeEvent.rename(columns={'time': 'time_obs'})
+    gdf_activeEvent['time'] = np.datetime64(datetime_)
+    
     gdf_activeEvent.to_file(tmp_path, driver="GeoJSON")
     # Move to mounted share
     dst_path = os.path.join(params['event']['dir_geoJson'], os.path.basename(tmp_path))
