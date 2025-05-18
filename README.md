@@ -25,6 +25,7 @@ hsVIIRS creates `config['hs']['dir_data']`:
 ├── VIIRS_NOAA21_NRT
 └── VIIRS_SNPP_NRT
 ```
+
 FET generates the fire event tracking data in `config['event']['dir_data']`
 ```
 .
@@ -46,7 +47,6 @@ FET generates the fire event tracking data in `config['event']['dir_data']`
     ├── 000002687_2025-05-04_0052.pkl
     ├── ....
 ```
-```
 
 
 # ROS
@@ -58,4 +58,4 @@ this is still in dev.
 sudo apt install gdal-bin
 sudo apt install texlive-latex-base texlive-latex-extra
 sudo apt install cm-super
-
+```
