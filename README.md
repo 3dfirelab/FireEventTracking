@@ -3,7 +3,7 @@ Compute spatial and temporal cluster of VIIRS hotspots to create vector fire Eve
 The executable is `src/run_fireEventTracking.sh`.
 Tis is run every time there are new hotsport available. See the repository [hsVIIRS](https://github.com/3dfirelab/hsVIIRS) to donwlaod VIIRS hotspots in NRT. 
 hsVIIRS and FET share the same congif file format, see `config/config-SILEX.yaml`:
-````
+```
 # config.yaml
 general:
   domain: -10,35,20,52
