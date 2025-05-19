@@ -9,4 +9,4 @@ hs:
 event:
   dir_data: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents
   dir_geoJson: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/GeoJson
-  start_time: '2025-05-01_0000'
+  start_time: '2025-05-18_0000'

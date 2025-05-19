@@ -69,6 +69,7 @@ def load_hs4lastObsAllSat(day,hour,params):
         if len(hsfiles)==1: 
             try:
                 df_ = pd.read_csv(hsfiles[0], delimiter=',', header=0)
+                df_ = df_.dropna()
             except EmptyDataError: 
                 continue
             if len(df_) == 0 : continue

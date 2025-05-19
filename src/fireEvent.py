@@ -44,8 +44,8 @@ class Event:
         self.id_fire_event = Event._id_counter
         Event._id_counter += 1
         
-        self.times = [cluster.end_time]
-        self.time_ranges = [(cluster.start_time,cluster.end_time)]
+        self.times = [cluster.end_time.tz_localize('UTC')]
+        self.time_ranges = [(cluster.start_time.tz_localize('UTC'),cluster.end_time.tz_localize('UTC'))]
         self.cluster_fire_event = [ctr.cluster_fire_event]
         self.ctrs  = gpd.GeoDataFrame([{'geometry':ctr.geometry}] ,crs=crs, geometry='geometry')
         self.centers = [Point(cluster.x, cluster.y)]
@@ -76,8 +76,8 @@ class Event:
     def add(self, cluster, ctr, crs, hs_all):
         if self.testSimilarityOfEvent(cluster, ctr): return  
         
-        self.times.append( cluster.end_time)
-        self.time_ranges.append((cluster.start_time,cluster.end_time))
+        self.times.append( cluster.end_time.tz_localize('UTC'))
+        self.time_ranges.append((cluster.start_time.tz_localize('UTC'),cluster.end_time.tz_localize('UTC')))
         self.cluster_fire_event.append(ctr.cluster_fire_event)
         self.ctrs = pd.concat([self.ctrs, gpd.GeoDataFrame([{'geometry':ctr.geometry}],crs=crs, geometry='geometry')]).reset_index(drop=True)
         self.centers.append(Point(cluster.x, cluster.y))

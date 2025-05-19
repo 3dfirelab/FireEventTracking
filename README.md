@@ -17,6 +17,7 @@ event:
   dir_geoJson: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/GeoJson
   start_time: '2025-05-01_0000'
 ```
+`start_time` is important to set for the first run. After it always start from the end of the last run.
 hsVIIRS creates `config['hs']['dir_data']`:
 ```
 .
@@ -25,8 +26,7 @@ hsVIIRS creates `config['hs']['dir_data']`:
 ├── VIIRS_NOAA21_NRT
 └── VIIRS_SNPP_NRT
 ```
-
-FET generates the fire event tracking data in `config['event']['dir_data']`
+FET generates the fire event tracking data in `config['event']['dir_data']`. 
 ```
 .
 ├── Fig/
@@ -60,7 +60,12 @@ Each event has a unique `id={:09d}.format()`. Info for each event are stored in 
 
 `Fig/` directory stores png images made every day at 20h00 for the last days only, no history is kept.
 
-
+Before Setting up into a cron using:
+```
+5 * * * * /home/paugam/Src/FireEventTracking/src/run_fireEventTracking.sh &> /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/cron.log
+```
+you need to create the dir `/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/`.
+FET is run 5min after every hour. hsVIIRS is run at 00h of every hour, and expected to be completed if data are available.
 
 # ROS
 Calculation of ROS is available in `src/loopFireEvents.py`.

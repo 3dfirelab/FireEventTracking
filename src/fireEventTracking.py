@@ -22,6 +22,9 @@ import shutil
 import glob
 import socket
 import argparse
+import re 
+from bisect import bisect_left
+
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -69,8 +72,8 @@ def init(config_name):
 ####################################################
 def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
     
-    start_datetime = datetime.strptime(f'{start_datetime}', '%Y-%m-%d_%H%M')
-    end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M')
+    start_datetime = datetime.strptime(f'{start_datetime}', '%Y-%m-%d_%H%M' ).replace(tzinfo=timezone.utc)
+    end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
 
     date_now = start_datetime
     
@@ -78,38 +81,60 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
     fireEvents = []
     pastFireEvents = []
     hsgdf_all_raw = None
-  
+ 
+    #select last data
+    last_hs_saved = sorted(glob.glob("{:s}/hotspots-*.gpkg".format(params['event']['dir_data'])))
+    idx_before = None
+    if len(last_hs_saved) > 0: 
+        start_datetime_available = []
+        for filename in last_hs_saved: 
+            match = re.search(r'hotspots-(\d{4}-\d{2}-\d{2})_(\d{4})', os.path.basename(filename))
+            date_part, time_part = match.groups()
+            # Combine into a datetime object and set to UTC
+            start_datetime_available.append( datetime.strptime(f"{date_part} {time_part}", "%Y-%m-%d %H%M").replace(tzinfo=timezone.utc) )
+       
+        idx = np.where(np.array(start_datetime_available)<=start_datetime)
+        if len(idx[0])> 0: 
+            idx_before = idx[0].max()
+        
     #load last active fire saved as well as the past event. past event older than 7 days are not loaded
-    if os.path.isfile("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'],start_datetime.strftime("%Y-%m-%d_%H%M")) ):
-        #activate loading existing data
-        hsgdf_all_raw = gpd.read_file("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'],start_datetime.strftime("%Y-%m-%d_%H%M")) )
-
-        fireEvents_files = sorted(glob.glob( params['event']['dir_data']+'/Pickles_{:s}_{:s}/*.pkl'.format('active',start_datetime.strftime("%Y-%m-%d_%H%M"))))
-        ii = 0
-        for id_, event_file in enumerate(fireEvents_files):
-            event = fireEvent.load_fireEvent(event_file)
-            while ii < event.id_fire_event:
-                fireEvents.append(None)
-                ii += 1
-            fireEvents.append( fireEvent.load_fireEvent(event_file) ) 
-            ii += 1
-        fireEvent.Event._id_counter = fireEvents[-1].id_fire_event +1
-
-        pastFireEvents_files = sorted(glob.glob( params['event']['dir_data']+'/Pickles_{:s}/*.pkl'.format('past',)))
-        for id_, event_file in enumerate(pastFireEvents_files):
-            try: 
-                end_time_ = datetime.strptime( '_'.join(event_file.split('.')[0].split('_')[-2:]), "%Y-%m-%d_%H%M")
-                if end_time_ > start_datetime - timedelta(days=7):
-                    pastFireEvents.append( fireEvent.load_fireEvent(event_file) ) 
+    if idx_before is not None:
+        start_time_last_available = start_datetime_available[idx_before]
+        if os.path.isfile("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'], start_time_last_available.strftime("%Y-%m-%d_%H%M") ) ):
+            #activate loading existing data
+            try:
+                hsgdf_all_raw = gpd.read_file("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'], start_time_last_available.strftime("%Y-%m-%d_%H%M")) )
             except: 
                 pdb.set_trace()
-        
+            fireEvents_files = sorted(glob.glob( params['event']['dir_data']+'/Pickles_{:s}_{:s}/*.pkl'.format('active', start_time_last_available.strftime("%Y-%m-%d_%H%M"))))
+            ii = 0
+            for id_, event_file in enumerate(fireEvents_files):
+                event = fireEvent.load_fireEvent(event_file)
+                while ii < event.id_fire_event:
+                    fireEvents.append(None)
+                    ii += 1
+                fireEvents.append( fireEvent.load_fireEvent(event_file) ) 
+                ii += 1
+            fireEvent.Event._id_counter = fireEvents[-1].id_fire_event +1
+
+            pastFireEvents_files = sorted(glob.glob( params['event']['dir_data']+'/Pickles_{:s}/*.pkl'.format('past',)))
+            for id_, event_file in enumerate(pastFireEvents_files):
+                try: 
+                    end_time_ = datetime.strptime( '_'.join(event_file.split('.')[0].split('_')[-2:]), "%Y-%m-%d_%H%M").replace(tzinfo=timezone.utc)
+                    if end_time_ > start_datetime - timedelta(days=7):
+                        pastFireEvents.append( fireEvent.load_fireEvent(event_file) ) 
+                except: 
+                    pdb.set_trace()
+       
         #date_now = date_now + timedelta(hours=1)    
 
-
+    
+    #print('')
+    #print('init list Events: ', count_not_none(fireEvents), len(pastFireEvents))
     idate = 0
+    flag_get_new_hs = False
     while date_now<end_datetime:
-        print(date_now, end='')
+        print(date_now.strftime("%Y-%m-%d_%H%M"), end=' | ')
         
 
         #if len(fireEvents) == 0: 
@@ -126,11 +151,14 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
         #load last obs
         hsgdf = hstools.load_hs4lastObsAllSat(day,hour,params)
         if len(hsgdf)==0: 
-            print(' skip')
-            date_now = date_now + timedelta(hours=1)    # subtract one day
+            print('  skip  ')
+            date_now = date_now + timedelta(hours=1)    
             idate+=1
             continue
-       
+     
+        print(date_now - hsgdf.timestamp.max().tz_localize('UTC'), end=' |  ')
+        print(hsgdf.timestamp.max().tz_localize('UTC'), end=' |  ')
+        flag_get_new_hs = True
         
         if hsgdf_all_raw is None:
             hsgdf_all_raw = hsgdf.copy()
@@ -243,12 +271,12 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
 
         if len(fireEvents) == 0: 
             #if no fire event were initialized, we set all cluster as fire event
-            print(' create first fireEvents')
+            print('  create ', end=' |')
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
                 event = fireEvent.Event(cluster,ctr,fireCluster.crs,hsgdf_all_raw) 
                 fireEvents.append(event)
         else: 
-            print(' append to fireEvents')
+            print('  append ', end=' |')
             gdf_activeEvent = create_gdf_fireEvents(fireEvents)
            
             #here we go over each cluster and assign it to an existing event if its center is inside an active fire event. if not, this is a new one
@@ -313,109 +341,15 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
                             #print('--', index_)
                             element = fireEvents[index_]
                             fireEvents[index_] = None
-                            #pastFireEvents.append(element)
+                            pastFireEvents.append(element)
 
                         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
                         #flag_found_matchingEvent = True
                         continue
 
-                    '''
-                    #for point in active fire event
-                    #-------------
-                    gdf_points = gdf_activeEvent[gdf_activeEvent.geometry.type == 'Point'].copy()
-                    # Check which polygons contain the point
-                    
-                    gdf_polygons_ =  gpd.GeoSeries([ctr.geometry],crs=gdf_points.crs)
-                    active_points_inside_cluster = gdf_points[gdf_points.geometry.apply(lambda point: gdf_polygons_.iloc[0].contains(point))].copy()
-                    
-                    #if 124 in active_points_inside_cluster.index: pdb.set_trace()
-
-                    # Get the polygons that contain the point
-                    if len(active_points_inside_cluster)==1:
-                        idx_event = active_points_inside_cluster.index[0]
-                        fireEvents[idx_event].add(cluster,ctr,fireCluster.crs,hsgdf_all_raw)
-                        #gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-                        #flag_found_matchingEvent = True
-                        continue
-                    elif len(active_points_inside_cluster)>1:
-                        active_points_inside_cluster['distancetopoly'] = active_points_inside_cluster.geometry.distance(ctr.geometry.centroid).copy()
-                        idx_event = active_points_inside_cluster['distancetopoly'].idxmin()
-                        fireEvents[idx_event].add(cluster,ctr,fireCluster.crs,hsgdf_all_raw)
-                        
-                        #merge with bigger
-                        other_indices = active_points_inside_cluster.index.difference([idx_event]).tolist()
-                        for index_ in other_indices:
-                            fireEvents[idx_event].merge(fireEvents[index_])
-                        
-                        fireEvents[idx_event].mergeWith(other_indices)
-                        
-                        #set merged event to past event
-                        for index_ in other_indices:
-                            #print('--', index_)
-                            element = fireEvents[index_]
-                            fireEvents[index_] = None
-                            #pastFireEvents.append(element)
-
-                        #gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-                        #flag_found_matchingEvent = True
-                        continue
-
-                    '''
-
-                    #gdf_points['distance_to_center'] = gdf_points.geometry.distance(ctr.geometry)
-                    #ros_max = 0.1
-                    #nearby_points = gdf_points[gdf_points['distance_to_center'] < ros_max * (cluster.end_time-gdf_points.time).dt.total_seconds() ]
-                    #nearby_points = gdf_points[gdf_points['distance_to_center'] < 5.e3 ]
-                    #if len(nearby_points) == 1: 
-                    #    idx_event = nearby_points.distance_to_center.idxmin()
-                    #    fireEvents[idx_event].add(cluster,ctr,fireCluster.crs, hsgdf_all_raw)
-                    #    continue
-                    
-                    #for line in active fire event, merge with line new cluster
-                    #-------------
-                    #if ctr.geometry.geom_type == 'LineString':
-                    #    gdf_lines = gdf_activeEvent[gdf_activeEvent.geometry.type == 'LineString'].copy()
-                    #    gdf_lines['distance_to_lines'] = gdf_lines.geometry.distance(ctr.geometry)
-                    #    nearby_lines = gdf_lines[gdf_lines['distance_to_lines'] < 5.e3 ]
-                    #    if len(nearby_lines) == 1:
-                    #        idx_event = nearby_lines.distance_to_lines.idxmin()
-                    #        fireEvents[idx_event].add(cluster,ctr,fireCluster.crs, hsgdf_all_raw)
-                    #        continue
-                
-                #if flag_found_matchingEvent: 
-                #    continue
 
                 if (ctr.geometry.geom_type == 'Point') | (ctr.geometry.geom_type == 'LineString'):
 
-                    '''
-                    #for polygon in active fire event
-                    #-------------
-                    gdf_polygons = gdf_activeEvent[(gdf_activeEvent.geometry.type == 'Polygon')].copy()
-                    # Check which polygons contain the point
-                    contains_mask = gdf_polygons.contains(ctr.geometry)
-                    # Get the polygons that contain the point
-                    matching_polygons = gdf_polygons[contains_mask]
-                    if len(matching_polygons) == 1: 
-                        pdb.set_trace()
-                        idx_event = matching_polygons.iloc[0].index
-                        fireEvents[idx_event].add(cluster,ctr,fireCluster.crs, hsgdf_all_raw)
-                        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-                        continue
-                    
-                    #for point in active fire event
-                    #-------------
-                    gdf_points = gdf_activeEvent[gdf_activeEvent.geometry.type == 'Point'].copy()
-                    gdf_points['distance_to_center'] = gdf_points.geometry.distance(ctr.geometry)
-                    ros_max = 0.1
-                    #nearby_points = gdf_points[gdf_points['distance_to_center'] < ros_max * (cluster.end_time-gdf_points.time).dt.total_seconds() ]
-                    nearby_points = gdf_points[gdf_points['distance_to_center'] < 5.e3 ]
-                    if len(nearby_points) == 1: 
-                        pdb.set_trace()
-                        idx_event = nearby_points.distance_to_center.idxmin()
-                        fireEvents[idx_event].add(cluster,ctr,fireCluster.crs, hsgdf_all_raw)
-                        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-                        continue
-                    '''
                     gdf_polygons = gdf_activeEvent[(gdf_activeEvent.geometry.type == 'Polygon')].copy()
                     active_gdf_polygons_containingPt = gdf_polygons[gdf_polygons.contains(ctr.geometry)]
                 
@@ -454,7 +388,7 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
                             #print('--', index_)
                             element = fireEvents[index_]
                             fireEvents[index_] = None
-                            #pastFireEvents.append(element)
+                            pastFireEvents.append(element)
 
                         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
                         #flag_found_matchingEvent = True
@@ -472,40 +406,45 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
         #remove fireEvent that were updated more than two day ago. 
         for id_, event in enumerate(fireEvents):
             if event is None: continue
-            if event.times[-1] < (date_now - timedelta(days=2)):
+            if event.times[-1] < (pd.Timestamp(date_now) - timedelta(days=2)):
                 element = fireEvents[id_]
                 fireEvents[id_] = None
                 pastFireEvents.append(element)
         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
         
         #remove old hotspot older than 7 days
-        hsgdf_all_raw = hsgdf_all_raw[hsgdf_all_raw['timestamp']>=date_now - timedelta(days=7)]
+        dt_naive = (date_now - timedelta(days=7)).replace(tzinfo=None)
+        date_now_64 = pd.Timestamp(dt_naive)
+        hsgdf_all_raw = hsgdf_all_raw[hsgdf_all_raw['timestamp']>=date_now_64 ]
 
         #end temporal loop
         date_now = date_now + timedelta(hours=1)    # subtract one day
         idate+=1
 
+    date_now = date_now - timedelta(hours=1)    # subtract one day
+    
     #save 
     #clean fire event dir
     #if os.path.isdir(params['event']['dir_data']+'Pickles_active/'):
     #    shutil.rmtree(params['event']['dir_data']+'Pickles_active/')
-   
-    if len(fireEvents)>0:
-        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
-        #gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents') #redondant with geojson below
-        gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, end_datetime, 'firEvents')
-        gdf_to_gpkgfile(hsgdf_all_raw, params, end_datetime, 'hotspots')
-
-    for id_, event in enumerate(fireEvents):
-        if event is not None: 
-            event.save( 'active', params, end_datetime)
+ 
+    #print(flag_get_new_hs, end_datetime)
+    if flag_get_new_hs:
+        if len(fireEvents)>0:
+            gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+            #gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents')
+            gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, date_now, 'firEvents')
+            gdf_to_gpkgfile(hsgdf_all_raw, params, date_now, 'hotspots')
+            
+        for id_, event in enumerate(fireEvents):
+            if event is not None: 
+                event.save( 'active', params, date_now)
+        print('  FireEvents saved: active: {:6d}  past: {:6d}'.format(count_not_none(fireEvents), len(pastFireEvents)))
 
     for id_, event in enumerate(pastFireEvents):
         event.save( 'past', params)
 
-    print('number of events saved:')
-    print('    active: {:d}'.format(count_not_none(fireEvents)))
-    print('    past  : {:d}'.format(len(pastFireEvents)))
+
 
     return end_datetime, fireEvents, pastFireEvents
 
@@ -522,8 +461,8 @@ def gdf_to_gpkgfile(gdf_activeEvent, params, datetime_, name_):
 def gdf_to_geojson(gdf_activeEvent, params, datetime_, name_):
     tmp_path = "./{:s}-{:s}.geojson".format(name_, datetime_.strftime("%Y-%m-%d_%H%M"))
     #set time attribute to time of the fire event and time_obs to the time of the last obs
-    gdf_activeEvent = gdf_activeEvent.rename(columns={'time': 'time_obs'})
-    gdf_activeEvent['time'] = np.datetime64(datetime_)
+    #gdf_activeEvent = gdf_activeEvent.rename(columns={'time': 'time_obs'})
+    #gdf_activeEvent['time'] = np.datetime64(datetime_)
     
     gdf_activeEvent.to_file(tmp_path, driver="GeoJSON")
     # Move to mounted share
@@ -652,6 +591,11 @@ if __name__ == '__main__':
     else:
         print('missing inputName')
         sys.exit()
+
+    #make sure all time are UTC
+    start = start.replace(tzinfo=timezone.utc)
+    end   = end.replace(tzinfo=timezone.utc)
+    
 
     #end = datetime.strptime('2025-05-01_2300', '%Y-%m-%d_%H%M')
     
