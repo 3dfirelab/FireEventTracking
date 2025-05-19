@@ -71,7 +71,7 @@ FET is run 5min after every hour. hsVIIRS is run at 00h of every hour, and expec
 Calculation of ROS is available in `src/loopFireEvents.py`.
 this is still in dev.
 
-### requirement
+### requirement for ROS
 ```
 sudo apt install gdal-bin
 sudo apt install texlive-latex-base texlive-latex-extra
