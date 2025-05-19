@@ -30,7 +30,7 @@ FET generates the fire event tracking data in `config['event']['dir_data']`.
 ```
 .
 ├── Fig/
-── GeoJson/
+├── GeoJson/
 │   ├── firEvents-2025-05-01_0400.geojson
 │   ├── ... 
 ├── hotspots-2025-05-01_0400.gpkg
