@@ -4,8 +4,11 @@ general:
   domainName: 'SILEX'
   crs: 25829
 hs:
-  dir_data: /mnt/data3/SILEX/FRP-HotSpot-aveiro
+  dir_data: /mnt/data3/AVEIRO/VIIRS-HotSpot
   sats: ['VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT', 'VIIRS_SNPP_NRT']
 event:
-  dir_data: /mnt/data3/SILEX/FRP-HotSpot-aveiro/FireEvents
+  file_HSDensity_ESAWorldCover: /mnt/dataEstrella2/ESAWorldCover/HSDensity/hs_density_europe.vrt
+  threshold_HSDensity_ESAWorldCover: 12 
+  dir_data:    /mnt/dataEstrella2/AVEIRO/VIIRS-HotSpot/FireEvents
+  dir_geoJson: /mnt/dataEstrella2/AVEIRO/VIIRS-HotSpot/FireEvents/GeoJson
 

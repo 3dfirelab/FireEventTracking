@@ -24,6 +24,8 @@ import socket
 import argparse
 import re 
 from bisect import bisect_left
+import rasterio
+import xarray as xr 
 
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
@@ -69,14 +71,113 @@ def init(config_name):
     return params
   
 
+##################################################################################
+def filter_points_by_mask(gdf: gpd.GeoDataFrame, mask_da: xr.DataArray, mask_value=1) -> gpd.GeoDataFrame:
+    """
+    Remove points from a GeoDataFrame where the corresponding value in a mask DataArray equals `mask_value`.
+
+    Parameters:
+    -----------
+    gdf : geopandas.GeoDataFrame
+        GeoDataFrame with Point geometries.
+    mask_da : xarray.DataArray
+        2D spatial mask with coordinates x (eastings) and y (northings).
+    mask_value : int or float, optional
+        The value in the mask used for exclusion (default is 1).
+
+    Returns:
+    --------
+    geopandas.GeoDataFrame
+        Filtered GeoDataFrame with only points where mask != mask_value.
+    """
+
+    # Ensure CRS matches
+    if gdf.crs != mask_da.rio.crs:
+        gdf = gdf.to_crs(mask_da.rio.crs)
+
+    # Extract x and y coordinates from the GeoDataFrame
+    x_coords = gdf.geometry.x.values
+    y_coords = gdf.geometry.y.values
+
+    # Sample the mask DataArray at point locations using nearest neighbor
+    sampled_vals = mask_da.sel(
+        x=xr.DataArray(x_coords, dims="points"),
+        y=xr.DataArray(y_coords, dims="points"),
+        method="nearest"
+    ).values
+
+    # Filter points where mask value is not equal to the exclusion value
+    keep_mask = sampled_vals != mask_value
+    return gdf[keep_mask].reset_index(drop=True)
+
+
 ####################################################
-def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
+#def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
+def perimeter_tracking(params, start_datetime, flag_restart=False):
     
     start_datetime = datetime.strptime(f'{start_datetime}', '%Y-%m-%d_%H%M' ).replace(tzinfo=timezone.utc)
-    end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+    #end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
 
-    date_now = start_datetime
-    
+    print('Load HS density')
+    if not(os.path.isfile(f'{src_dir}/../data_local/mask_hs_ESAworldCover_600m_europe.nc')): 
+        with rasterio.open(params['event']['file_HSDensity_ESAWorldCover']) as src:
+            HSDensity = src.read(1, masked=True)  # Use masked=True to handle nodata efficiently
+            transform = src.transform
+            crs = src.crs
+            threshold = params['event']['threshold_HSDensity_ESAWorldCover']
+
+        # Apply mask directly using NumPy vectorization
+        mask_HS = (HSDensity > threshold).astype(np.uint8)
+
+        # Build coordinate arrays using affine transform (faster with linspace)
+        height, width = mask_HS.shape
+        x0, dx = transform.c, transform.a
+        y0, dy = transform.f, transform.e
+
+        x_coords = x0 + dx * np.arange(width)
+        y_coords = y0 + dy * np.arange(height)
+
+        # Create DataArray and attach CRS
+        maskHS_da = xr.DataArray(
+            mask_HS,
+            dims=["y", "x"],
+            coords={"y": y_coords, "x": x_coords},
+            name="HSDensity"
+        ).rio.write_crs(crs or "EPSG:4326", inplace=False)
+        maskHS_da.to_netcdf(f'{src_dir}/../data_local/mask_hs_ESAworldCover_600m_europe.nc')
+    else: 
+        maskHS_da = xr.open_dataset(f'{src_dir}/../data_local/mask_hs_ESAworldCover_600m_europe.nc')['HSDensity']
+
+    '''
+    #load HS mask from ESAWorldCover
+    print('load HS density')
+    with rasterio.open(params['event']['file_HSDensity_ESAWorldCover']) as src:
+        # Print basic metadata
+        #print("CRS:", src.crs)
+        #print("Bounds:", src.bounds)
+        #print("Width, Height:", src.width, src.height)
+        #print("Count (bands):", src.count)
+        HSDensity = src.read(1)
+        HSDensity_transform = src.transform
+    mask_HS = np.where(HSDensity>params['event']['threshold_HSDensity_ESAWorldCover'], 1, 0)
+    # Get shape
+    height, width = HSDensity.shape
+
+    # Compute coordinates from affine transform
+    x_coords = np.arange(width) * HSDensity_transform.a + HSDensity_transform.c
+    y_coords = np.arange(height) * HSDensity_transform.e + HSDensity_transform.f
+
+    # Note: affine.e is usually negative (from top-left), so y decreases downwards
+
+    # Create DataArray
+    maskHS_da = xr.DataArray(
+                                mask_HS,
+                                dims=["y", "x"],
+                                coords={"y": y_coords, "x": x_coords},
+                                name="HSDensity"
+                            )
+    maskHS_da.rio.write_crs("EPSG:4326", inplace=True)
+    '''
     #load fire event
     fireEvents = []
     pastFireEvents = []
@@ -128,7 +229,8 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
        
         #date_now = date_now + timedelta(hours=1)    
 
-    
+    date_now = start_datetime + timedelta(hours=1)
+    end_datetime = date_now + timedelta(hours=1)
     #print('')
     #print('init list Events: ', count_not_none(fireEvents), len(pastFireEvents))
     idate = 0
@@ -159,7 +261,10 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
         print(date_now - hsgdf.timestamp.max().tz_localize('UTC'), end=' |  ')
         print(hsgdf.timestamp.max().tz_localize('UTC'), end=' |  ')
         flag_get_new_hs = True
-        
+       
+        #filter HS industry
+        hsgdf = filter_points_by_mask(hsgdf, maskHS_da )
+
         if hsgdf_all_raw is None:
             hsgdf_all_raw = hsgdf.copy()
         else: 
@@ -168,8 +273,8 @@ def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
                 print('')
                 print('find duplicate hotspot in new entry')
                 pdb.set_trace()
-            hsgdf.index = range(hsgdf_all_raw.index.max() + 1, hsgdf_all_raw.index.max() + 1 + len(hsgdf))
             try:
+                hsgdf.index = range(hsgdf_all_raw.index.max() + 1, hsgdf_all_raw.index.max() + 1 + len(hsgdf))
                 hsgdf_all_raw = pd.concat([hsgdf_all_raw.assign(version=hsgdf_all_raw['version'].astype(str)),hsgdf.assign(version=hsgdf_all_raw['version'].astype(str))])
             except: 
                 pdb.set_trace()
@@ -612,6 +717,7 @@ if __name__ == '__main__':
     end_time = None
     while current <= end:
 
+        end_time = current  
         #get last time processed
         if os.path.isfile("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'],(current+timedelta(hours=1)).strftime("%Y-%m-%d_%H%M")) ):
             print(current, end=' already done\n')
@@ -620,14 +726,13 @@ if __name__ == '__main__':
         
         #track perimeter
         start_datetime = current.strftime('%Y-%m-%d_%H%M')
-        end_datetime   = (current + timedelta(hours=1)).strftime('%Y-%m-%d_%H%M')
-        date_now, fireEvents, pastFireEvents = perimeter_tracking(params, start_datetime,end_datetime)
+        #end_datetime   = (current + timedelta(hours=1)).strftime('%Y-%m-%d_%H%M')
+        date_now, fireEvents, pastFireEvents = perimeter_tracking(params, start_datetime)#,end_datetime)
         
         if date_now.hour == 20 and date_now.minute == 0:
             #ploting
             plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=False, flag_remove_singleHs=True)
 
-        end_time = current  
         #control hourly loop
         current += timedelta(hours=1)
 
