@@ -1,5 +1,7 @@
 import xarray as xr
 import numpy as np
+import pdb 
+
 class projForeFire: 
 
     def __init__(self, WSENLBRT):

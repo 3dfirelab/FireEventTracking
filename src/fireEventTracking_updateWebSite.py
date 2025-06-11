@@ -69,7 +69,10 @@ for f in geojson_files:
 # Move the latest file to the destination
 if gdfs:
     shutil.move(output_path_merged, dest_file)
-    shutil.copy2(source_dir+ 'log/fireEventTracking.log', '/mnt/homeEstrella/WebSite/leaflet/data/logs/fireEventTracking.log')
+    try:
+        shutil.copy2(source_dir+ 'log/fireEventTracking.log', '/mnt/homeEstrella/WebSite/leaflet/data/logs/fireEventTracking.log')
+    except: 
+        pass
     print(f"Moved latest file: {output_path_merged} → {dest_file}")
     
     #and push to corte

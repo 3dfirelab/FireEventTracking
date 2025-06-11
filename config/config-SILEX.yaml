@@ -3,12 +3,20 @@ general:
   domain: -10,35,20,52
   domainName: 'SILEX'
   crs: 25829
+  use_sedoo_drive: True 
+  sedoo_mountpath: /home/paugam/SEDOO/
 hs:
+  #dir_data: /home/paugam/SEDOO/VIIRS/hotspots
   dir_data: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot
   sats: ['VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT', 'VIIRS_SNPP_NRT']
 event:
   file_HSDensity_ESAWorldCover: /mnt/dataEstrella2/ESAWorldCover/HSDensity/hs_density_europe.vrt
-  threshold_HSDensity_ESAWorldCover: 12 
+  threshold_HSDensity_ESAWorldCover: 11 
+  file_polygonIndus_OSM: /mnt/dataEstrella2/OSM_IndustrialZone/industrialZone_osmSource-europe.geojson
+  dir_FWI:  /mnt/dataEstrella2/SILEX/AROME/FWI
+  dir_WIND: /mnt/dataEstrella2/SILEX/AROME/FORECAST/WIND/
+  #dir_data: /home/paugam/SEDOO/VIIRS/fire_events 
+  #dir_geoJson: /home/paugam/SEDOO/VIIRS/fire_events/GeoJson
   dir_data: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents
   dir_geoJson: /mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/GeoJson
-  start_time: '2025-05-18_0000'
+  start_time: '2025-06-01_0000'
