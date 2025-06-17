@@ -1,7 +1,6 @@
 name: tracking
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - _libgcc_mutex=0.1
   - _openmp_mutex=4.5
@@ -340,6 +339,4 @@ dependencies:
   - zlib=1.3.1
   - zstandard=0.23.0
   - zstd=1.5.7
-  - pip:
-      - pyforefire==2024.1
-prefix: /home/paugam/miniconda3/envs/tracking
+prefix: /home/paugam/miniforge/envs/tracking

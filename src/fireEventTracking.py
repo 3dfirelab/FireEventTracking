@@ -165,82 +165,84 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
     start_datetime = datetime.strptime(f'{start_datetime}', '%Y-%m-%d_%H%M' ).replace(tzinfo=timezone.utc)
     #end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
 
-    #print('Load HS density')
-    if not(os.path.isfile(f'{src_dir}/../data_local/mask_hs_600m_europe.nc')): 
-        print('generate mask for fix hs ...')
-        print('using VIIRS HS density from 2024 and polygon mask from OSM')
-        with rasterio.open(params['event']['file_HSDensity_ESAWorldCover']) as src:
-            HSDensity = src.read(1, masked=True)  # Use masked=True to handle nodata efficiently
-            transform = src.transform
-            crs = src.crs
-            threshold = params['event']['threshold_HSDensity_ESAWorldCover']
+    maskHS_da = None
+    if params['event']['file_HSDensity_ESAWorldCover'] != 'None': 
+        #print('Load HS density')
+        if not(os.path.isfile(f'{src_dir}/../data_local/mask_hs_600m_europe.nc')): 
+            print('generate mask for fix hs ...')
+            print('using VIIRS HS density from 2024 and polygon mask from OSM')
+            with rasterio.open(params['event']['file_HSDensity_ESAWorldCover']) as src:
+                HSDensity = src.read(1, masked=True)  # Use masked=True to handle nodata efficiently
+                transform = src.transform
+                crs = src.crs
+                threshold = params['event']['threshold_HSDensity_ESAWorldCover']
 
-        # Apply mask directly using NumPy vectorization
-        mask_HS = (HSDensity > threshold).astype(np.uint8)
+            # Apply mask directly using NumPy vectorization
+            mask_HS = (HSDensity > threshold).astype(np.uint8)
 
-        # Build coordinate arrays using affine transform (faster with linspace)
-        height, width = mask_HS.shape
-        x0, dx = transform.c, transform.a
-        y0, dy = transform.f, transform.e
+            # Build coordinate arrays using affine transform (faster with linspace)
+            height, width = mask_HS.shape
+            x0, dx = transform.c, transform.a
+            y0, dy = transform.f, transform.e
 
-        x_coords = x0 + dx * np.arange(width)
-        y_coords = y0 + dy * np.arange(height)
+            x_coords = x0 + dx * np.arange(width)
+            y_coords = y0 + dy * np.arange(height)
 
-        # Create DataArray and attach CRS
-        maskHS_da = xr.DataArray(
-            mask_HS,
-            dims=["y", "x"],
-            coords={"y": y_coords, "x": x_coords},
-        ).rio.write_crs(crs, inplace=False)
-        
-        
-        #add OSM industrial polygon to the mask
-        indusAll = gpd.read_file(params['event']['file_polygonIndus_OSM']).to_crs(crs) 
-       
-        #transform = rasterio.transform.from_bounds(
-        #    west=maskHS_da.lon.min().item(),
-        #    south=maskHS_da.lat.min().item(),
-        #    east=maskHS_da.lon.max().item(),
-        #    north=maskHS_da.lat.max().item(),
-        #    width=maskHS_da.sizes['x'],
-        #    height=maskHS_da.sizes['y']
-        #)
+            # Create DataArray and attach CRS
+            maskHS_da = xr.DataArray(
+                mask_HS,
+                dims=["y", "x"],
+                coords={"y": y_coords, "x": x_coords},
+            ).rio.write_crs(crs, inplace=False)
+            
+            
+            #add OSM industrial polygon to the mask
+            indusAll = gpd.read_file(params['event']['file_polygonIndus_OSM']).to_crs(crs) 
+           
+            #transform = rasterio.transform.from_bounds(
+            #    west=maskHS_da.lon.min().item(),
+            #    south=maskHS_da.lat.min().item(),
+            #    east=maskHS_da.lon.max().item(),
+            #    north=maskHS_da.lat.max().item(),
+            #    width=maskHS_da.sizes['x'],
+            #    height=maskHS_da.sizes['y']
+            #)
 
-        out_shape = (maskHS_da.sizes['y'], maskHS_da.sizes['x'])
+            out_shape = (maskHS_da.sizes['y'], maskHS_da.sizes['x'])
 
-        # 3. Rasterize: burn value 1 wherever a polygon touches a pixel
-        mask_array = rasterize(
-            [(geom, 1) for geom in indusAll.geometry],
-            out_shape=out_shape,
-            transform=transform,
-            fill=0,
-            all_touched=True,  # key to ensure touching pixels are included
-            dtype='uint8'
-        )
+            # 3. Rasterize: burn value 1 wherever a polygon touches a pixel
+            mask_array = rasterize(
+                [(geom, 1) for geom in indusAll.geometry],
+                out_shape=out_shape,
+                transform=transform,
+                fill=0,
+                all_touched=True,  # key to ensure touching pixels are included
+                dtype='uint8'
+            )
 
-        # 4. Create a new DataArray aligned with maskHS_da
-        mask_rasterized = xr.DataArray(
-            mask_array,
-            dims=("y", "x"),
-            coords={"y": maskHS_da.y, "x": maskHS_da.x}
-        )
+            # 4. Create a new DataArray aligned with maskHS_da
+            mask_rasterized = xr.DataArray(
+                mask_array,
+                dims=("y", "x"),
+                coords={"y": maskHS_da.y, "x": maskHS_da.x}
+            )
 
-        # 5. Update maskHS_da where the rasterized mask is 1
-        maskHS_da = xr.where(mask_rasterized == 1, 1, maskHS_da)
-        
-        #apply a dilatation
-        footprint = np.ones((3, 3), dtype=bool)
-        dilated_mask = binary_dilation(maskHS_da.values, structure=footprint)
-        maskHS_da = xr.DataArray(
-            dilated_mask,
-            dims=("y", "x"),
-            coords={"y": maskHS_da.y, "x": maskHS_da.x}
-        )
+            # 5. Update maskHS_da where the rasterized mask is 1
+            maskHS_da = xr.where(mask_rasterized == 1, 1, maskHS_da)
+            
+            #apply a dilatation
+            footprint = np.ones((3, 3), dtype=bool)
+            dilated_mask = binary_dilation(maskHS_da.values, structure=footprint)
+            maskHS_da = xr.DataArray(
+                dilated_mask,
+                dims=("y", "x"),
+                coords={"y": maskHS_da.y, "x": maskHS_da.x}
+            )
 
-        maskHS_da.to_netcdf(f'{src_dir}/../data_local/mask_hs_600m_europe.nc')
+            maskHS_da.to_netcdf(f'{src_dir}/../data_local/mask_hs_600m_europe.nc')
 
-    else: 
-        maskHS_da = xr.open_dataarray(f'{src_dir}/../data_local/mask_hs_600m_europe.nc').rio.write_crs("EPSG:4326", inplace=False)
+        else: 
+            maskHS_da = xr.open_dataarray(f'{src_dir}/../data_local/mask_hs_600m_europe.nc').rio.write_crs("EPSG:4326", inplace=False)
 
     '''
     #load HS mask from ESAWorldCover
@@ -275,7 +277,7 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
     #load fire event
     fireEvents = []
     pastFireEvents = []
-    flag_PastFireEvent = False
+    flag_PastFireEvent = True
     hsgdf_all_raw = None
  
     #select last data
@@ -401,7 +403,7 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
 
         #filter HS industry
         n_hs_before_filter = len(hsgdf)
-        hsgdf = filter_points_by_mask(hsgdf, maskHS_da )
+        if maskHS_da is not None: hsgdf = filter_points_by_mask(hsgdf, maskHS_da )
         if len(hsgdf)==0: 
             print(' skip  ')
             date_now = date_now + timedelta(hours=1)    
@@ -738,7 +740,7 @@ def count_not_none(lst):
 def plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_remove_singleHs=False):
     # Create a figure with Cartopy
     fig, ax = plt.subplots(figsize=(10, 6),
-                       subplot_kw={'projection': ccrs.epsg(params['general']['crs']) })  # PlateCarree() == EPSG:4326
+                       subplot_kw={'projection': ccrs.PlateCarree()} ) #ccrs.epsg(params['general']['crs']) })  # PlateCarree() == EPSG:4326
 
     # Add basic map features
     ax.coastlines(linewidth=0.2)
@@ -759,7 +761,7 @@ def plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_r
 
         # Map each time value to a color
         colors = [cmap(norm(t)) for t in times_numeric]
-       
+      
         #event.plot(ax=ax,alpha=0.4,c='k',markersize=10)
         for (irow,row_ctr), (_,row_hs) in zip(event.ctrs.iterrows(),event.hspots.iterrows()):
             #if mm : 
@@ -769,23 +771,24 @@ def plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_r
             if row_ctr.geometry.geom_type == 'Point':
                 if flag_remove_singleHs: 
                     if len(event.times) == 1: continue
-                gpd.GeoSeries([row_ctr.geometry]).plot(ax=ax, color=colors[irow], linewidth=0.1, zorder=2, alpha=0.7, markersize=1)
+                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).plot(ax=ax, color=colors[irow], linewidth=0.1, zorder=2, alpha=0.7, markersize=1)
             else:
-                gpd.GeoSeries([row_ctr.geometry]).plot(ax=ax, facecolor='none',edgecolor=colors[irow], cmap=cmap, linewidth=1, zorder=2, alpha=0.7)
+                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor=colors[irow], cmap=cmap, linewidth=1, zorder=2, alpha=0.7)
             if flag_plot_hs:
-                points = gpd.GeoSeries([row_hs.geometry]).explode(index_parts=False)
-                points.plot(ax=ax, color=colors[irow], alpha=0.5, markersize=40)
+                points = gpd.GeoSeries([row_hs.geometry]).explode(index_parts=False).set_crs(params['general']['crs'])
+                if len(points)>0:
+                    points.to_crs(4326).plot(ax=ax, color=colors[irow], alpha=0.5, markersize=40)
     
     for event in pastFireEvents:
         if flag_remove_singleHs: 
             if len(event.times) == 1: continue
-        event.ctrs.plot(ax=ax, facecolor='none',edgecolor='k', alpha=0.2, linewidth=0.1, linestyle='--', zorder=1, markersize=1)
+        event.ctrs.set_crs(params['general']['crs']).plot(ax=ax, facecolor='none',edgecolor='k', alpha=0.2, linewidth=0.1, linestyle='--', zorder=1, markersize=1)
 
     ax.set_title(date_now)
 
     # Set extent if needed
-    extent=params['general']['domain'].split(',')
-    ax.set_extent([extent[i] for i in [0,2,1,3]])
+    extentmm=params['general']['domain'].split(',')
+    ax.set_extent([float(extentmm[i]) for i in [0,2,1,3]])
 
     # Add gridlines with labels
     gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.5)
@@ -837,6 +840,11 @@ if __name__ == '__main__':
         start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
         end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
     
+    elif inputName == 'ofunato': 
+        params = init(inputName,log_dir) 
+        start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
+        end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
+    
     elif inputName == 'SILEX': 
         params = init('SILEX',log_dir)
         if os.path.isfile(log_dir+'/timeControl.txt'): 
@@ -879,7 +887,7 @@ if __name__ == '__main__':
         
         if date_now.hour == 20 and date_now.minute == 0:
             #ploting
-            plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=False, flag_remove_singleHs=True)
+            plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_remove_singleHs=True)
 
         #control hourly loop
         current += timedelta(hours=1)
