@@ -837,8 +837,8 @@ if __name__ == '__main__':
         start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
         end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
     
-    elif inputName == 'SILEX': 
-        params = init('SILEX',log_dir)
+    elif 'SILEX' in inputName : 
+        params = init(inputName,log_dir)
         if os.path.isfile(log_dir+'/timeControl.txt'): 
             with open(log_dir+'/timeControl.txt','r') as f:
                 start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)

@@ -27,8 +27,10 @@ if __name__== '__main__':
     importlib.reload(rasterizeFET)
 
 # def path
-    dirData = '/mnt/dataEstrella2/SILEX/'
-    dirFireEvent = dirData+'VIIRS-HotSpot/FireEvents/GeoJson/'
+    #dirData = '/mnt/dataEstrella2/SILEX/'
+    #dirFireEvent = dirData+'VIIRS-HotSpot/FireEvents/GeoJson/'
+    dirData = '/home/paugamr/data/VIIRS/'
+    dirFireEvent = dirData+'fire_events/GeoJson/'
     geojsons =sorted(glob.glob(dirFireEvent+'*.geojson'))
 
     os.makedirs(dirData+'MOCAGE/',exist_ok=True)
@@ -40,8 +42,8 @@ if __name__== '__main__':
     lats, lons = np.meshgrid(lat,lon)
 
 #define start end time
-    start_time = np.datetime64("2025-05-18T04:00:00") #assume UTC
-    end_time   = np.datetime64("2025-06-02T23:50:00")
+    start_time = np.datetime64("2025-06-14T22:00:00") #assume UTC
+    end_time   = np.datetime64("2025-06-16T22:00:00")
     
     # Build cell polygons
     nx, ny = lats.shape
