@@ -6,7 +6,8 @@ import os
 import shutil
 import pdb 
 
-data_dir = '/mnt/data3/FireEventTracking/'
+#data_dir = '/mnt/data3/FireEventTracking/'
+data_dir = '/home/paugam/Data/2025_ofunato/'
 
 satnames = ['VIIRS_SNPP_NRT', 'VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT']
 
@@ -32,7 +33,7 @@ for satname in satnames:
             df = pd.read_csv(fileInCSV)
             
             year = pd.to_datetime(df['acq_date'][0]).year
-            dirout = '{:s}{:4d}/'.format(dirIn,year)
+            dirout = dirIn #'{:s}{:4d}/'.format(dirIn,year)
             os.makedirs(dirout,exist_ok=True)
 
             # Ensure acq_time is zero-padded to 4 digits

@@ -1,0 +1,15 @@
+# config.yaml
+general:
+  domain: 141.4,38.9,142.1,39.5
+  domainName: 'ofunato'
+  time_start: 2025-02-24_0000
+  time_end: 2025-03-02_0000
+  crs: 6679
+  use_sedoo_drive: False
+  root_data: /home/paugam/Data/2025_ofunato/
+hs:
+  dir_data: "ORIGIN/hotspots"
+  sats: ['VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT', 'VIIRS_SNPP_NRT']
+event:
+  dir_data: "ORIGIN/fire_events" 
+  dir_geoJson: "ORIGIN/fire_events/GeoJson"

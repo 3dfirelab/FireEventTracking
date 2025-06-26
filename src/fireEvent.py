@@ -166,7 +166,7 @@ class Event:
         if len(glob.glob( params['event']['dir_data']+f'/Pickles_{"past"}/{self.id_fire_event:09d}_*' ) ) > 0 : 
             print(self.id_fire_event)
             print('file id is alreay there!!!!')
-            pdb.se_trace()
+            pdb.set_trace()
 
         with open(file_path, 'wb') as f:
             pickle.dump(self, f)

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os 
 import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt 
 import sys
 from pathlib import Path
@@ -90,15 +91,23 @@ def create_gdf_fireEvents(fireEvents):
 
 
 ####################################################
-def init(config_name, log_dir):
+def is_mounted(path):
+    return os.path.ismount(path)
+
+####################################################
+def init(config_name, sensorName, log_dir):
     script_dir = Path(__file__).resolve().parent
     params = hstools.load_config(str(script_dir)+f'/../config/config-{config_name}.yaml')
-  
-    #if params['general']['use_sedoo_drive']:
-    #    #mount SEDOO drive.
-    #    mount_sftp_with_sshfs(params['general']['sedoo_mountpath'])
-    #pdb.set_trace()
+ 
+    if params['general']['use_sedoo_drive']:
+        if not ( is_mounted(params['general']['root_data'])) :
+            print('missing AERIS disc')
+            sys.exit()
     
+    params['hs']['dir_data'] = params['general']['root_data'] + params['hs']['dir_data'].replace('ORIGIN',sensorName)
+    params['event']['dir_data'] = params['general']['root_data'] + params['event']['dir_data'].replace('ORIGIN',sensorName)
+    params['general']['sensor'] = sensorName
+
     if socket.gethostname() == 'moritz': 
         params['hs']['dir_data'] = params['hs']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
         params['event']['dir_data'] = params['event']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
@@ -111,7 +120,11 @@ def init(config_name, log_dir):
     os.makedirs(params['event']['dir_data'],exist_ok=True)
     os.makedirs(log_dir,exist_ok=True)
     if 'dir_geoJson' in params['event'].keys():
+        params['event']['dir_geoJson'] = params['general']['root_data'] + params['event']['dir_geoJson'].replace('ORIGIN',sensorName)
         os.makedirs(params['event']['dir_geoJson'],exist_ok=True)
+    if 'dir_frp' in params['event'].keys():
+        params['event']['dir_frp'] = params['general']['root_data'] + params['event']['dir_frp'].replace('ORIGIN',sensorName)
+        os.makedirs(params['event']['dir_frp'],exist_ok=True)
     
 
     return params
@@ -160,12 +173,12 @@ def filter_points_by_mask(gdf: gpd.GeoDataFrame, mask_da: xr.DataArray, mask_val
 
 ####################################################
 #def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
-def perimeter_tracking(params, start_datetime, flag_restart=False):
+def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
     
     start_datetime = datetime.strptime(f'{start_datetime}', '%Y-%m-%d_%H%M' ).replace(tzinfo=timezone.utc)
     #end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
 
-    maskHS_da = None
+    '''
     if params['event']['file_HSDensity_ESAWorldCover'] != 'None': 
         #print('Load HS density')
         if not(os.path.isfile(f'{src_dir}/../data_local/mask_hs_600m_europe.nc')): 
@@ -243,7 +256,8 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
 
         else: 
             maskHS_da = xr.open_dataarray(f'{src_dir}/../data_local/mask_hs_600m_europe.nc').rio.write_crs("EPSG:4326", inplace=False)
-
+    '''
+    #
     '''
     #load HS mask from ESAWorldCover
     print('load HS density')
@@ -357,12 +371,17 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
        
         #date_now = date_now + timedelta(hours=1)    
 
-    date_now = start_datetime + timedelta(hours=1)
-    end_datetime = date_now + timedelta(hours=1)
+    date_now     = start_datetime #+ timedelta(minutes=dt_minutes)
+    end_datetime = start_datetime + timedelta(minutes=dt_minutes)
+    if params['general']['sensor'] == 'VIIRS':
+        dt_minutes_perimeters =  dt_minutes
+    elif params['general']['sensor'] == 'FCI':
+        dt_minutes_perimeters = 10. 
     #print('')
     #print('init list Events: ', count_not_none(fireEvents), len(pastFireEvents))
     idate = 0
     flag_get_new_hs = False
+    
     while date_now<end_datetime:
         print(date_now.strftime("%Y-%m-%d_%H%M"), end=' | ')
         
@@ -382,7 +401,7 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
         hsgdf = hstools.load_hs4lastObsAllSat(day,hour,params)
         if len(hsgdf)==0: 
             print('skip  ')
-            date_now = date_now + timedelta(hours=1)    
+            date_now = date_now + timedelta(minutes=dt_minutes_perimeters)    
             idate+=1
             continue
         
@@ -393,7 +412,8 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
         else: 
             delta_seconds = (date_now - hsgdf.timestamp.max().tz_localize('UTC')).total_seconds()
             sign_delta_seconds = -1
-        
+       
+
         # Convert to hours and minutes
         hours = int(delta_seconds // 3600)
         minutes = int((delta_seconds % 3600) // 60)
@@ -406,26 +426,36 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
         if maskHS_da is not None: hsgdf = filter_points_by_mask(hsgdf, maskHS_da )
         if len(hsgdf)==0: 
             print(' skip  ')
-            date_now = date_now + timedelta(hours=1)    
+            date_now = date_now + timedelta(minutes=dt_minutes_perimeters)    
             idate+=1
             continue
         n_hs_after_filter = len(hsgdf)
-        print(f'- {n_hs_before_filter-n_hs_after_filter:04d} hs  |  ', end ='')
+        print(f'{n_hs_after_filter:06d} HS  |  ', end ='')
+        print(f'- {n_hs_before_filter-n_hs_after_filter:04d} fixHS  |  ', end ='')
         flag_get_new_hs = True
 
         if hsgdf_all_raw is None:
             hsgdf_all_raw = hsgdf.copy()
         else: 
-            duplicates = pd.merge(hsgdf_all_raw.assign(version=hsgdf_all_raw['version'].astype(str)), hsgdf.assign(version=hsgdf_all_raw['version'].astype(str)), how='inner')
+            if params['general']['sensor'] == 'VIIRS':
+                duplicates = pd.merge(hsgdf_all_raw.assign(version=hsgdf_all_raw['version'].astype(str)), hsgdf.assign(version=hsgdf_all_raw['version'].astype(str)), how='inner')
+            elif params['general']['sensor'] == 'FCI':
+                duplicates = pd.merge(hsgdf_all_raw, hsgdf, how='inner')
+            
             if len(duplicates)>0: 
                 print('')
                 print('find duplicate hotspot in new entry')
                 pdb.set_trace()
+            
             with warnings.catch_warnings(): 
                 warnings.simplefilter("error", FutureWarning)
                 try:
                     hsgdf.index = range(hsgdf_all_raw.index.max() + 1, hsgdf_all_raw.index.max() + 1 + len(hsgdf))
-                    hsgdf_all_raw = pd.concat([hsgdf_all_raw.assign(version=hsgdf_all_raw['version'].astype(str)),hsgdf.assign(version=hsgdf_all_raw['version'].astype(str))])
+                    if params['general']['sensor'] == 'VIIRS':
+                        hsgdf_all_raw = pd.concat([hsgdf_all_raw.assign(version=hsgdf_all_raw['version'].astype(str)),hsgdf.assign(version=hsgdf_all_raw['version'].astype(str))])
+                    elif params['general']['sensor'] == 'FCI':
+                        hsgdf_all_raw = pd.concat([hsgdf_all_raw,hsgdf])
+                
                 except: 
                     pdb.set_trace()
             
@@ -433,14 +463,16 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
             #    hsgdf_all_raw = hsgdf_all_raw.drop(index=19604)
             #except: 
             #    pass
-
         hsgdf_all = hsgdf_all_raw.copy()
         # Use DBSCAN for spatial clustering (define 1000 meters as the spatial threshold)
         # DBSCAN requires the distance in degrees, so you might need to convert meters to degrees.
         # Approximation: 1 degree latitude ~ 111 km.
         #epsilon = 1. / 111.0  # Approx. 1 km in degrees
         #db = DBSCAN(eps=epsilon, min_samples=1, metric='haversine').fit(np.array(gdf[['longitude','latitude' ]]))
-        epsilon = 800  # Approx. 1 km in degrees
+        if params['general']['sensor'] == 'VIIRS':
+            epsilon = 800  
+        elif params['general']['sensor'] == 'FCI':
+            epsilon = 2000  
         hsgdf_all["x"] = hsgdf_all.geometry.x
         hsgdf_all["y"] = hsgdf_all.geometry.y
         db = DBSCAN(eps=epsilon, min_samples=1, metric='euclidean').fit(np.array(hsgdf_all[['x','y' ]]))
@@ -597,7 +629,10 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
                             #print('--', index_)
                             element = fireEvents[index_]
                             fireEvents[index_] = None
-                            if flag_PastFireEvent: pastFireEvents.append(element)
+                            if flag_PastFireEvent: 
+                                for event in pastFireEvents:
+                                    if event.id_fire_event == 872: pdb.set_trace()
+                                pastFireEvents.append(element)
 
                         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
                         #flag_found_matchingEvent = True
@@ -644,7 +679,10 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
                             #print('--', index_)
                             element = fireEvents[index_]
                             fireEvents[index_] = None
-                            if flag_PastFireEvent: pastFireEvents.append(element)
+                            if flag_PastFireEvent: 
+                                for event in pastFireEvents:
+                                    if event.id_fire_event == 872: pdb.set_trace()
+                                pastFireEvents.append(element)
 
                         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
                         #flag_found_matchingEvent = True
@@ -658,7 +696,7 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
                 new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw) 
                 fireEvents.append(new_event)
                 #pdb.set_trace()
-                if new_event.id_fire_event == 242: pdb.set_trace()
+                #if new_event.id_fire_event == 242: pdb.set_trace()
 
         #remove fireEvent that were updated more than two day ago. 
         for id_, event in enumerate(fireEvents):
@@ -666,7 +704,10 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
             if event.times[-1] < (pd.Timestamp(date_now) - timedelta(days=2)):
                 element = fireEvents[id_]
                 fireEvents[id_] = None
-                if flag_PastFireEvent: pastFireEvents.append(element)
+                if flag_PastFireEvent: 
+                    for event in pastFireEvents:
+                        if event.id_fire_event == 872: pdb.set_trace()
+                    pastFireEvents.append(element)
         gdf_activeEvent = create_gdf_fireEvents(fireEvents)
         
         #remove old hotspot older than 7 days
@@ -675,10 +716,12 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
         hsgdf_all_raw = hsgdf_all_raw[hsgdf_all_raw['timestamp']>=date_now_64 ]
 
         #end temporal loop
-        date_now = date_now + timedelta(hours=1)    # subtract one day
+        date_now = date_now + timedelta(minutes=dt_minutes_perimeters)    # subtract one day
         idate+=1
+    
+        if date_now<end_datetime : print('')
 
-    date_now = date_now - timedelta(hours=1)    # subtract one day
+    #date_now = date_now - timedelta(minutes=dt_minutes_perimeters)    # subtract one day
     
     #save 
     #clean fire event dir
@@ -690,12 +733,20 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
         if len(fireEvents)>0:
             gdf_activeEvent = create_gdf_fireEvents(fireEvents)
             #gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents')
-            gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, date_now, 'firEvents')
-            gdf_to_gpkgfile(hsgdf_all_raw, params, date_now, 'hotspots')
+            gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, start_datetime, 'firEvents')
+            gdf_to_gpkgfile(hsgdf_all_raw, params, start_datetime, 'hotspots')
             
         for id_, event in enumerate(fireEvents):
             if event is not None: 
-                event.save( 'active', params, date_now)
+                event.save( 'active', params, start_datetime)
+                #print FRP time serie of active event 
+                fig = plt.figure(figsize=(10,5))
+                ax=plt.subplot(111)
+                ax.plot(event.times, event.frps, marker='o', linestyle='-')
+                ax.set_xlabel('time')
+                ax.set_ylabel('FRP (MW)')
+                fig.savefig(f"{params['event']['dir_frp']:s}/{event.id_fire_event:09d}.png")
+                plt.close(fig)
 
         if flag_PastFireEvent:
             print('  FireEvents saved: active: {:6d}  past: {:6d}'.format(count_not_none(fireEvents), len(pastFireEvents)))
@@ -707,7 +758,7 @@ def perimeter_tracking(params, start_datetime, flag_restart=False):
 
 
 
-    return end_datetime, fireEvents, pastFireEvents
+    return start_datetime, fireEvents, pastFireEvents
 
 ##############################################
 def gdf_to_gpkgfile(gdf_activeEvent, params, datetime_, name_):
@@ -739,6 +790,16 @@ def count_not_none(lst):
 ###############################################
 def plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_remove_singleHs=False):
     # Create a figure with Cartopy
+    mpl.rcdefaults()
+    mpl.rcParams['text.usetex'] = True
+    mpl.rcParams['legend.fontsize'] = 'small'
+    mpl.rcParams['legend.fancybox'] = True
+    mpl.rcParams['figure.subplot.left'] = .1
+    mpl.rcParams['figure.subplot.right'] = .9
+    mpl.rcParams['figure.subplot.top'] = .9
+    mpl.rcParams['figure.subplot.bottom'] = .1
+    mpl.rcParams['figure.subplot.hspace'] = 0.01
+    mpl.rcParams['figure.subplot.wspace'] = 0.01  
     fig, ax = plt.subplots(figsize=(10, 6),
                        subplot_kw={'projection': ccrs.PlateCarree()} ) #ccrs.epsg(params['general']['crs']) })  # PlateCarree() == EPSG:4326
 
@@ -782,14 +843,15 @@ def plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_r
     for event in pastFireEvents:
         if flag_remove_singleHs: 
             if len(event.times) == 1: continue
-        event.ctrs.set_crs(params['general']['crs']).plot(ax=ax, facecolor='none',edgecolor='k', alpha=0.2, linewidth=0.1, linestyle='--', zorder=1, markersize=1)
+        event.ctrs.set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor='k', alpha=0.2, linewidth=0.1, linestyle='--', zorder=1, markersize=1)
 
     ax.set_title(date_now)
 
     # Set extent if needed
     extentmm=params['general']['domain'].split(',')
     ax.set_extent([float(extentmm[i]) for i in [0,2,1,3]])
-
+    ax.set_aspect(1)
+    
     # Add gridlines with labels
     gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.5)
     gl.top_labels = False
@@ -800,9 +862,9 @@ def plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_r
     filename = "{:s}/Fig/fireEvent-{:s}-{:s}.png".format(params['event']['dir_data'],params['general']['domainName'],date_now.strftime("%Y-%m-%d_%H%M")) 
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     
-    fig.savefig(filename,dpi=600)
+    fig.savefig(filename,dpi=200)
     plt.close(fig)
-
+    
     #plt.show()
 
 
@@ -819,11 +881,13 @@ if __name__ == '__main__':
   
     parser = argparse.ArgumentParser(description="fireEventTracking")
     parser.add_argument("--inputName", type=str, help="name of the configuration input", )
+    parser.add_argument("--sensorName", type=str, help="name of the sensor, VIIRS or FCI", )
     parser.add_argument("--log_dir", type=str, help="Directory for logs", default='/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/')
 
     args = parser.parse_args()
 
     inputName = args.inputName
+    sensorName = args.sensorName
     log_dir = args.log_dir
    
     #log_dir = sys.argv[2]
@@ -831,29 +895,30 @@ if __name__ == '__main__':
 
     #init dir
     if inputName == '202504': 
-        params = init('202504',log_dir) 
+        params = init(inputName,sensorName,log_dir) 
         start = datetime.strptime('2025-04-12_0000', '%Y-%m-%d_%H%M')
         end = datetime.strptime('2025-04-15_0000', '%Y-%m-%d_%H%M')
     
     elif inputName == 'AVEIRO': 
-        params = init('AVEIRO',log_dir) 
+        params = init(inputName,sensorName,log_dir) 
         start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
         end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
     
     elif inputName == 'ofunato': 
-        params = init(inputName,log_dir) 
+        params = init(inputName,sensorName,log_dir) 
         start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
         end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
     
     elif 'SILEX' in inputName : 
-        params = init(inputName,log_dir)
+        params = init(inputName,sensorName,log_dir) 
         if os.path.isfile(log_dir+'/timeControl.txt'): 
             with open(log_dir+'/timeControl.txt','r') as f:
                 start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         
-        end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        #end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        end = datetime.strptime('2025-06-18_2300', '%Y-%m-%d_%H%M')
   
     else:
         print('missing inputName')
@@ -861,36 +926,54 @@ if __name__ == '__main__':
     
     #make sure all time are UTC
     start = start.replace(tzinfo=timezone.utc)
-    end   = end.replace(tzinfo=timezone.utc)
+    end   = end.replace(tzinfo=timezone.utc) #- timedelta(hours=1)
+
     print('########times#########')
     print(start)
     print(end)
     print('######################')
-
+    maskHS_da = None
+    if 'mask_HS' in params['event']:
+        if os.path.isfile(f"{src_dir}/../data_local/{params['event']['mask_HS']}"):
+            maskHS_da = xr.open_dataarray(f"{src_dir}/../data_local/{params['event']['mask_HS']}").rio.write_crs("EPSG:4326", inplace=False)
+    else:
+        print(' ')
+        print('## WARNING ####################')
+        print('no hotspot mask was set in cong file')
+        print('see src_extra/create_mask_fixFire to generate one')
+        print('and set it in conf/event')
+        print('## WARNING ####################')
+        print(' ')
 
     # Loop hourly
     current = start
     end_time = None
+    if params['general']['sensor'] == 'VIIRS':
+        dt_minutes = 60.
+    elif params['general']['sensor'] == 'FCI':
+        dt_minutes = 30.
+    
     while current <= end:
-
+            
         end_time = current  
         #get last time processed
-        if os.path.isfile("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'],(current+timedelta(hours=1)).strftime("%Y-%m-%d_%H%M")) ):
+        #if os.path.isfile("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'],(current+timedelta(minutes=dt_minutes)).strftime("%Y-%m-%d_%H%M")) ):
+        if os.path.isfile("{:s}/hotspots-{:s}.gpkg".format(params['event']['dir_data'],(current).strftime("%Y-%m-%d_%H%M")) ):
             print(current, end=' already done\n')
-            current += timedelta(hours=1)
+            current += timedelta(minutes=dt_minutes)
             continue 
         
         #track perimeter
         start_datetime = current.strftime('%Y-%m-%d_%H%M')
         #end_datetime   = (current + timedelta(hours=1)).strftime('%Y-%m-%d_%H%M')
-        date_now, fireEvents, pastFireEvents = perimeter_tracking(params, start_datetime)#,end_datetime)
+        date_now, fireEvents, pastFireEvents = perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes)#,end_datetime)
         
-        if date_now.hour == 20 and date_now.minute == 0:
-            #ploting
-            plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_remove_singleHs=True)
+        #if date_now.hour in [0,3,6,9,12,15,18,21] and date_now.minute == 0:
+        #    #ploting
+        #    plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_remove_singleHs=True)
 
         #control hourly loop
-        current += timedelta(hours=1)
+        current += timedelta(minutes=dt_minutes)
 
     with open(log_dir+'/timeControl.txt','w') as f:
         f.write(end_time.strftime('%Y-%m-%d_%H%M'))
