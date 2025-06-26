@@ -25,11 +25,17 @@ if __name__== '__main__':
 #########################
     
     importlib.reload(rasterizeFET)
+    
+    if len(sys.argv) < 4: 
+        print('missing input argument')
+        print('stop here')
+        sys.exit()
 
 # def path
     #dirData = '/mnt/dataEstrella2/SILEX/'
     #dirFireEvent = dirData+'VIIRS-HotSpot/FireEvents/GeoJson/'
-    dirData = '/home/paugamr/data/VIIRS/'
+    #dirData = '/home/paugamr/data/VIIRS/'
+    dirData = sys.argv[3]
     dirFireEvent = dirData+'fire_events/GeoJson/'
     geojsons =sorted(glob.glob(dirFireEvent+'*.geojson'))
 
@@ -42,9 +48,16 @@ if __name__== '__main__':
     lats, lons = np.meshgrid(lat,lon)
 
 #define start end time
-    start_time = np.datetime64("2025-06-14T22:00:00") #assume UTC
-    end_time   = np.datetime64("2025-06-16T22:00:00")
-    
+    end_time = np.datetime64(sys.argv[1]) #assume UTC
+    start_time   = end_time - np.timedelta64(int(sys.argv[2]), 'h')
+
+    #start_time = np.datetime64("2025-06-14T22:00:00") #assume UTC
+    #end_time   = np.datetime64("2025-06-16T22:00:00")
+
+    print('rasterize FRP on MOCAGE grid for ')
+    print('start date:', start_time)
+    print('end date  :', end_time)
+
     # Build cell polygons
     nx, ny = lats.shape
     grid_polys = np.empty((nx - 1, ny - 1), dtype=object)
@@ -80,6 +93,7 @@ if __name__== '__main__':
 # Works for Shapely 2.x using .geometries
     geom_to_ij = {geom: ij for geom, ij in zip(tree.geometries, ij_list)}
 
+    print(len(geojsons))
 
     frp_list = []
     for geojson in geojsons:
@@ -87,12 +101,16 @@ if __name__== '__main__':
         match = re.search(r'firEvents-(\d{4}-\d{2}-\d{2})_(\d{4})', os.path.basename(geojson))
         date_part, time_part = match.groups()
         timestamp = np.datetime64(f"{date_part}T{time_part[:2]}:{time_part[2:]}:00")
-       
+      
+        print(timestamp)      
         if not (start_time <= timestamp <= end_time): continue
         
         frp_da = rasterizeFET.geojson2raster(geojson,timestamp, lons, lats, grid_polys, tree, geom_to_ij)
         if frp_da is None: continue
         frp_list.append(frp_da)
+
+
+    print(len(frp_list))
 
 # Concatenate all time slices and set attrs
     frp_series = xr.concat(frp_list, dim="time")

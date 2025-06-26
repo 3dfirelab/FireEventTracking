@@ -291,7 +291,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
     #load fire event
     fireEvents = []
     pastFireEvents = []
-    flag_PastFireEvent = True
+    flag_PastFireEvent = False
     hsgdf_all_raw = None
  
     #select last data
@@ -775,7 +775,16 @@ def gdf_to_geojson(gdf_activeEvent, params, datetime_, name_):
     #set time attribute to time of the fire event and time_obs to the time of the last obs
     #gdf_activeEvent = gdf_activeEvent.rename(columns={'time': 'time_obs'})
     #gdf_activeEvent['time'] = np.datetime64(datetime_)
-    
+   
+    sensor = params['general']['sensor']
+
+    url_image_root = "https://api.sedoo.fr/aeris-euburn-silex-rest/resource/fires/{:s}/fire_events/FRP/{:09d}.png"
+
+    pdb.set_trace()
+    gdf_activeEvent['image'] = gdf_activeEvent['id_fire_event'].apply(
+                                                                        lambda x: url_image_root.format(sensor, int(x))
+                                                                     )
+
     gdf_activeEvent.to_file(tmp_path, driver="GeoJSON")
     # Move to mounted share
     dst_path = os.path.join(params['event']['dir_geoJson'], os.path.basename(tmp_path))
@@ -917,8 +926,8 @@ if __name__ == '__main__':
         else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         
-        #end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
-        end = datetime.strptime('2025-06-18_2300', '%Y-%m-%d_%H%M')
+        end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        #end = datetime.strptime('2025-06-18_2300', '%Y-%m-%d_%H%M')
   
     else:
         print('missing inputName')

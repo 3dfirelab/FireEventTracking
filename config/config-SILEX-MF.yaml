@@ -4,19 +4,25 @@ general:
   domainName: 'SILEX'
   crs: 25829
   use_sedoo_drive: True 
-  sedoo_mountpath: /home/paugamr/data/
+  root_data: /home/paugamr/data/
 hs:
-  #dir_data: /home/paugam/SEDOO/VIIRS/hotspots
-  dir_data: /home/paugamr/data/VIIRS/hotspots/
-  sats: ['VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT', 'VIIRS_SNPP_NRT']
+  dir_data: ORIGIN/hotspots/
+  sats: ['']
 event:
-  file_HSDensity_ESAWorldCover: /home/paugamr/data/HotspotDensity2024/HSDensity/hs_density_europe.vrt
-  threshold_HSDensity_ESAWorldCover: 11 
-  file_polygonIndus_OSM: /home/paugamr/data/OSM/industrialZone_osmSource-europe.geojson
+  dir_data: ORIGIN/fire_events 
+  dir_geoJson: ORIGIN/fire_events/GeoJson
+  dir_frp: ORIGIN/fire_events/FRP
+  start_time: '2025-06-26_0000'
+  mask_HS: mask_hs_600m_europe.nc
+postproc:
+  dir_FWI:  AROME/FWI
+  dir_WIND: AROME/FORECAST/WIND/
+OLD:  
+  #file_HSDensity_ESAWorldCover: /home/paugamr/data/HotspotDensity2024/HSDensity/hs_density_europe.vrt
+  #threshold_HSDensity_ESAWorldCover: 11 
+  #file_polygonIndus_OSM: /home/paugamr/data/OSM/industrialZone_osmSource-europe.geojson
   #dir_FWI:  /mnt/dataEstrella2/SILEX/AROME/FWI
   #dir_WIND: /mnt/dataEstrella2/SILEX/AROME/FORECAST/WIND/
   #dir_data: /home/paugam/SEDOO/VIIRS/fire_events/ 
   #dir_geoJson: /home/paugam/SEDOO/VIIRS/fire_events/GeoJson/
-  dir_data: /home/paugamr/data/VIIRS/fire_events/
-  dir_geoJson: /home/paugamr/data/VIIRS/fire_events/GeoJson/
-  start_time: '2025-06-10_0000'
+  #start_time: '2025-06-10_0000'
