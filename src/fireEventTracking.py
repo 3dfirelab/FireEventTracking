@@ -780,8 +780,7 @@ def gdf_to_geojson(gdf_activeEvent, params, datetime_, name_):
 
     url_image_root = "https://api.sedoo.fr/aeris-euburn-silex-rest/resource/fires/{:s}/fire_events/FRP/{:09d}.png"
 
-    pdb.set_trace()
-    gdf_activeEvent['image'] = gdf_activeEvent['id_fire_event'].apply(
+    gdf_activeEvent['image'] = gdf_activeEvent.index.to_series().apply(
                                                                         lambda x: url_image_root.format(sensor, int(x))
                                                                      )
 
