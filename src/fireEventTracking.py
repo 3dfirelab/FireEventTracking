@@ -38,7 +38,7 @@ import hstools
 import fireEvent
 import os
 import subprocess
-
+import discordMessage
 
 #########################################
 def mount_sftp_with_sshfs(mount_point):
@@ -165,6 +165,11 @@ def init(config_name, sensorName, log_dir):
     params['hs']['dir_data'] = params['general']['root_data'] + params['hs']['dir_data'].replace('ORIGIN',sensorName)
     params['event']['dir_data'] = params['general']['root_data'] + params['event']['dir_data'].replace('ORIGIN',sensorName)
     params['general']['sensor'] = sensorName
+
+    if params['general']['sensor'] == 'FCI':
+        params['general']['discord_channel']=int(os.environ['discord_channel_id_fire_alert_fci'])
+    elif params['general']['sensor'] == 'VIIRS':
+        params['general']['discord_channel']=int(os.environ['discord_channel_id_fire_alert_viirs'])
 
     if socket.gethostname() == 'moritz': 
         params['hs']['dir_data'] = params['hs']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
@@ -640,6 +645,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
                 event = fireEvent.Event(cluster,ctr,fireCluster.crs,hsgdf_all_raw) 
                 fireEvents.append(event)
+                discordMessage.send_message_to_discord(
+                     f'FET: new Fire\n\tfrp: {event.frps[-1]}\n\ttime: {event.times[-1]}\n\tcenter: {event.centers[-1]}\n\tarea: {1.e-4*event.areas[-1]:.2f} ha', 
+                                                       params['general']['discord_channel']
+                                                    )
                 #if event.id_fire_event == 242: pdb.set_trace()
 
         else: 
@@ -774,6 +783,13 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 #print('????????????????? new event')
                 new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw) 
                 fireEvents.append(new_event)
+                try:
+                    discordMessage.send_message_to_discord(
+                     f'FET: new Fire\n\tfrp: {new_event.frps[-1]}\n\ttime: {new_event.times[-1]}\n\tcenter: {new_event.centers[-1]}\n\tarea: {1.e-4*new_event.areas[-1]:.2f} ha', 
+                                                           params['general']['discord_channel']
+                                                        )
+                except: 
+                    pdb.set_trace()
                 #if new_event.id_fire_event == 242: pdb.set_trace()
 
         #remove fireEvent that were updated more than two day ago. 
@@ -988,11 +1004,11 @@ def run_fire_tracking(args):
         else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         
-        #end = datetime.strptime('2025-06-18_2300', '%Y-%m-%d_%H%M')
-        if params['general']['sensor'] == 'VIIRS':
-            end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
-        elif params['general']['sensor'] == 'FCI':
-            end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(minutes=20)
+        end = datetime.strptime('2025-06-27_0430', '%Y-%m-%d_%H%M')
+        #if params['general']['sensor'] == 'VIIRS':
+        #    end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
+        #elif params['general']['sensor'] == 'FCI':
+        #    end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(minutes=20)
   
     else:
         print('missing inputName')

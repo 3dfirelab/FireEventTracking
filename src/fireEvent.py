@@ -63,7 +63,9 @@ class Event:
         hsfrps =  hs_all.loc[self.indices_hs[-1]].frp.tolist()
         self.hspots['frp'] = None 
         self.hspots.at[0,'frp'] = hsfrps
-       
+        
+        self.areas = self.ctrs.geometry.area.to_list()
+
         #if  self.id_fire_event == 10:
         #    ax=plt.subplot(111)
         #    self.ctrs.iloc[-1:].plot(ax=ax,facecolor='none')
@@ -96,7 +98,9 @@ class Event:
         
         hsfrps =  hs_all.loc[self.indices_hs[-1]].frp.tolist()
         self.hspots.at[self.hspots.index[-1], 'frp'] = hsfrps
-       
+      
+        self.areas = self.ctrs.geometry.area.to_list()
+
         #if  self.id_fire_event == 10:
         #    ax=plt.subplot(111)
         #    self.ctrs.iloc[-1:].plot(ax=ax,facecolor='none')
