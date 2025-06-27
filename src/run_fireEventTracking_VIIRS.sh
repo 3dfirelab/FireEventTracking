@@ -1,14 +1,9 @@
 #!/bin/bash
 
-export aerisDir=/home/paugamr/data/
-if mountpoint $aerisDir ; then
-    echo "aeris disc mounted"
-else
-    (echo '8aVFFL#9Ez'; echo '') | sshfs EUBURN_FIRES@repo.sedoo.fr:/ $aerisDir -o password_stdin
-fi
+export srcDir=/home/paugamr/Src/FireEventTracking/src
+"$srcDir"/mount_aeris.sh
 
 export dataDir=/home/paugamr/data/VIIRS/hotspots
-export srcDir=/home/paugamr/Src/FireEventTracking/src
 export ctrlDir=/home/paugamr/data/VIIRS/log
 export logDir=/home/paugamr/data/VIIRS/fire_events/log
 if [ ! -d "$logDir" ]; then

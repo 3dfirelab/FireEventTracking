@@ -1,14 +1,9 @@
 #!/bin/bash
 
-export aerisDir=/home/paugamr/data/
-if mountpoint $aerisDir ; then
-    echo "aeris disc mounted"
-else
-    (echo '8aVFFL#9Ez'; echo '') | sshfs EUBURN_FIRES@repo.sedoo.fr:/ $aerisDir -o password_stdin
-fi
+export srcDir=/home/paugamr/Src/FireEventTracking/src
+"$srcDir"/mount_aeris.sh
 
 export dataDir=/home/paugamr/data/FCI/hotspots
-export srcDir=/home/paugamr/Src/FireEventTracking/src
 export ctrlDir=/home/paugamr/data/FCI/log
 export logDir=/home/paugamr/data/FCI/fire_events/log
 if [ ! -d "$logDir" ]; then
@@ -28,7 +23,7 @@ if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     #/home/paugamr/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
 fi
 
-#if grep -qs "[[:space:]]$aerisDir[[:space:]]" /proc/self/mountinfo; then
-#    umount $aerisDir 
+#if grep -qs "[[:space:]]$MOUNT_POINT[[:space:]]" /proc/self/mountinfo; then
+#    umount $MOUNT_POINT 
 #fi
 

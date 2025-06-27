@@ -29,6 +29,7 @@ import rasterio
 import xarray as xr 
 from rasterio.features import rasterize
 from scipy.ndimage import binary_dilation
+from concurrent.futures import ThreadPoolExecutor
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -75,7 +76,7 @@ def mount_sftp_with_sshfs(mount_point):
         sys.exit()
 
 #############################
-def create_gdf_fireEvents(fireEvents):
+def create_gdf_fireEvents(params,fireEvents):
     
     filtered_fireEvents = [x for x in fireEvents if x is not None]
     
@@ -87,7 +88,64 @@ def create_gdf_fireEvents(fireEvents):
     gdf_activeEvent['id_fire_event'] = [fireEvent.id_fire_event for fireEvent in  filtered_fireEvents]
     gdf_activeEvent = gdf_activeEvent.set_index('id_fire_event')
 
+    eurostat_postcode_boundaries = gpd.read_file(params['general']['root_data']+'/'+params['event']['eurostat'])
+    gdf_activeEvent = assign_fire_names_from_postcode(gdf_activeEvent, eurostat_postcode_boundaries)
+
     return gdf_activeEvent
+
+
+####################################################
+def assign_fire_names_from_postcode(
+    gdf_fire: gpd.GeoDataFrame,
+    gdf_postcode: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """
+    Assigns fire_name to fire events using spatial join with postcode and city info.
+    Adds only the 'fire_name' column to the original GeoDataFrame.
+
+    Parameters
+    ----------
+    gdf_fire : GeoDataFrame
+        Fire events with 'center' (Point geometry) and 'time' columns.
+    gdf_postcode : GeoDataFrame
+        Postcode boundaries with at least: 'geometry', 'POSTCODE', 'CITY', 'CNTR_CODE'.
+    crs_postcode : str
+        CRS of the postcode GeoDataFrame (default 'EPSG:25829').
+
+    Returns
+    -------
+    GeoDataFrame
+        Input GeoDataFrame with one additional column: 'fire_name'.
+    """
+    # Make a copy to avoid modifying original
+    gdf_fire2 = gdf_fire.copy()
+
+    # Ensure proper CRS
+    gdf_postcode = gdf_postcode.to_crs(gdf_fire.crs)
+    gdf_fire2 = gdf_fire2.set_geometry("center").set_crs(gdf_fire.crs)
+
+    # Spatial join
+    joined = gpd.sjoin(
+        gdf_fire2[["center", "time"]],
+        gdf_postcode[["geometry", "NSI_CODE", "COMM_NAME", "CNTR_CODE", "NUTS_CODE"]],
+        how="left",
+        predicate="intersects"
+    )
+
+    # Compose fire_name only
+    fire_name = (
+        "fire_" +
+        joined["CNTR_CODE"].fillna("XX") + "_" +
+        joined["NSI_CODE"].fillna("00000").astype(str) + "_" +
+        joined["COMM_NAME"].replace(' ','').fillna("UnknownCity").str.replace(" ", "") + "_" +
+        joined["NUTS_CODE"].fillna("00000").astype(str) + "_" +
+        pd.to_datetime(joined["time"]).dt.strftime("%Y%m%d")
+    )
+
+    # Insert only fire_name back into the original dataframe
+    gdf_fire["fire_name"] = fire_name.values
+
+    return gdf_fire
 
 
 ####################################################
@@ -170,6 +228,25 @@ def filter_points_by_mask(gdf: gpd.GeoDataFrame, mask_da: xr.DataArray, mask_val
     keep_mask = sampled_vals != mask_value
     return gdf[keep_mask].reset_index(drop=True).to_crs(crs_gdf)
 
+
+####################################################
+def cache_file(params, fireEvents_files, max_workers=16):
+    local_dir = "/tmp/paugamr/fireEvents_local_{params['general']['sensor']}/"
+    os.makedirs(local_dir, exist_ok=True)
+
+    def copy_to_local(remote_file):
+        local_path = os.path.join(local_dir, os.path.basename(remote_file))
+        if not os.path.exists(local_path):
+            try:
+                shutil.copy(remote_file, local_path)
+            except Exception as e:
+                print(f"Warning: Failed to copy {remote_file}: {e}")
+        return local_path
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        local_paths = list(executor.map(copy_to_local, fireEvents_files))
+
+    return local_paths
 
 ####################################################
 #def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
@@ -308,7 +385,6 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         idx = np.where(np.array(start_datetime_available)<=start_datetime)
         if len(idx[0])> 0: 
             idx_before = idx[0].max()
-        
     #load last active fire saved as well as the past event. past event older than 7 days are not loaded
     if idx_before is not None:
         start_time_last_available = start_datetime_available[idx_before]
@@ -319,16 +395,19 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             except: 
                 pdb.set_trace()
             fireEvents_files = sorted(glob.glob( params['event']['dir_data']+'/Pickles_{:s}_{:s}/*.pkl'.format('active', start_time_last_available.strftime("%Y-%m-%d_%H%M"))))
+            
+            local_fireEvents_files = cache_file(params, fireEvents_files)
             ii = 0
-            for id_, event_file in enumerate(fireEvents_files):
+            for id_, event_file in enumerate(local_fireEvents_files):
                 event = fireEvent.load_fireEvent(event_file)
                 while ii < event.id_fire_event:
                     fireEvents.append(None)
                     ii += 1
-                fireEvents.append( fireEvent.load_fireEvent(event_file) ) 
+                #fireEvents.append( fireEvent.load_fireEvent(event_file) ) 
+                fireEvents.append( event ) 
                 ii += 1
             fireEvent.Event._id_counter = fireEvents[-1].id_fire_event +1
-
+            shutil.rmtree(os.path.dirname(local_fireEvents_files[0])) 
 
             # Set your directory and threshold date
             directory_past = params['event']['dir_data']+'/Pickles_{:s}/'.format('past')
@@ -561,11 +640,11 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
                 event = fireEvent.Event(cluster,ctr,fireCluster.crs,hsgdf_all_raw) 
                 fireEvents.append(event)
-                if event.id_fire_event == 242: pdb.set_trace()
+                #if event.id_fire_event == 242: pdb.set_trace()
 
         else: 
             print(' append ', end=' |')
-            gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+            gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
            
             #here we go over each cluster and assign it to an existing event if its center is inside an active fire event. if not, this is a new one
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
@@ -598,7 +677,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                     if len(active_pp_matching_cluster)==1:
                         idx_event = active_pp_matching_cluster.index[0]
                         fireEvents[idx_event].add(cluster,ctr,fireCluster.crs,hsgdf_all_raw)
-                        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+                        gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
                         #flag_found_matchingEvent = True
                         continue
                     
@@ -630,11 +709,11 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                             element = fireEvents[index_]
                             fireEvents[index_] = None
                             if flag_PastFireEvent: 
-                                for event in pastFireEvents:
-                                    if event.id_fire_event == 872: pdb.set_trace()
+                                #for event in pastFireEvents:
+                                #    if event.id_fire_event == 872: pdb.set_trace()
                                 pastFireEvents.append(element)
 
-                        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+                        gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
                         #flag_found_matchingEvent = True
                         continue
 
@@ -652,7 +731,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                     if len(active_pp_matching_cluster)==1:
                         idx_event = active_pp_matching_cluster.index[0]
                         fireEvents[idx_event].add(cluster,ctr,fireCluster.crs,hsgdf_all_raw)
-                        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+                        gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
                         #flag_found_matchingEvent = True
                         continue
                     
@@ -680,11 +759,11 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                             element = fireEvents[index_]
                             fireEvents[index_] = None
                             if flag_PastFireEvent: 
-                                for event in pastFireEvents:
-                                    if event.id_fire_event == 872: pdb.set_trace()
+                                #for event in pastFireEvents:
+                                #    if event.id_fire_event == 872: pdb.set_trace()
                                 pastFireEvents.append(element)
 
-                        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+                        gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
                         #flag_found_matchingEvent = True
                         continue
 
@@ -695,7 +774,6 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 #print('????????????????? new event')
                 new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw) 
                 fireEvents.append(new_event)
-                #pdb.set_trace()
                 #if new_event.id_fire_event == 242: pdb.set_trace()
 
         #remove fireEvent that were updated more than two day ago. 
@@ -705,10 +783,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 element = fireEvents[id_]
                 fireEvents[id_] = None
                 if flag_PastFireEvent: 
-                    for event in pastFireEvents:
-                        if event.id_fire_event == 872: pdb.set_trace()
+                    #for event in pastFireEvents:
+                    #    if event.id_fire_event == 872: pdb.set_trace()
                     pastFireEvents.append(element)
-        gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+        gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
         
         #remove old hotspot older than 7 days
         dt_naive = (date_now - timedelta(days=7)).replace(tzinfo=None)
@@ -731,7 +809,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
     #print(flag_get_new_hs, end_datetime)
     if flag_get_new_hs:
         if len(fireEvents)>0:
-            gdf_activeEvent = create_gdf_fireEvents(fireEvents)
+            gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
             #gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents')
             gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, start_datetime, 'firEvents')
             gdf_to_gpkgfile(hsgdf_all_raw, params, start_datetime, 'hotspots')
@@ -876,24 +954,9 @@ def plot(params, date_now, fireEvents, pastFireEvents, flag_plot_hs=True, flag_r
     #plt.show()
 
 
-#############################
-if __name__ == '__main__':
-#############################
-    
-    '''
-    SILEX
-    domain: -10,35,20,46
-    '''
-    importlib.reload(hstools)
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-  
-    parser = argparse.ArgumentParser(description="fireEventTracking")
-    parser.add_argument("--inputName", type=str, help="name of the configuration input", )
-    parser.add_argument("--sensorName", type=str, help="name of the sensor, VIIRS or FCI", )
-    parser.add_argument("--log_dir", type=str, help="Directory for logs", default='/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/')
 
-    args = parser.parse_args()
-
+############################
+def run_fire_tracking(args):
     inputName = args.inputName
     sensorName = args.sensorName
     log_dir = args.log_dir
@@ -925,8 +988,11 @@ if __name__ == '__main__':
         else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         
-        end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
         #end = datetime.strptime('2025-06-18_2300', '%Y-%m-%d_%H%M')
+        if params['general']['sensor'] == 'VIIRS':
+            end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
+        elif params['general']['sensor'] == 'FCI':
+            end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(minutes=20)
   
     else:
         print('missing inputName')
@@ -985,4 +1051,30 @@ if __name__ == '__main__':
 
     with open(log_dir+'/timeControl.txt','w') as f:
         f.write(end_time.strftime('%Y-%m-%d_%H%M'))
+
+
+#############################
+if __name__ == '__main__':
+#############################
+    
+    '''
+    SILEX
+    domain: -10,35,20,46
+    '''
+    importlib.reload(hstools)
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+  
+    parser = argparse.ArgumentParser(description="fireEventTracking")
+    parser.add_argument("--inputName", type=str, help="name of the configuration input", )
+    parser.add_argument("--sensorName", type=str, help="name of the sensor, VIIRS or FCI", )
+    parser.add_argument("--log_dir", type=str, help="Directory for logs", default='/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/')
+
+    args = parser.parse_args()
+
+    import cProfile
+    import pstats
+    cProfile.run('run_fire_tracking(args)', 'profile_output')
+
+    p = pstats.Stats('profile_output')
+    p.strip_dirs().sort_stats('cumtime').print_stats(20)
 
