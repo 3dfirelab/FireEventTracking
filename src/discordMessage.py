@@ -4,11 +4,9 @@ import os
 
 
 TOKEN = os.environ['discord_token_fire_alert'] 
-CHANNEL_ID = int(os.environ['discord_channel_id_fire_alert'])  # Replace with your channel ID
-
 
 ###############################
-def send_message_to_discord(message):
+def send_message_to_discord(message, CHANNEL_ID):
 
     intents = discord.Intents.default()
     client = discord.Client(intents=intents)
@@ -26,4 +24,7 @@ def send_message_to_discord(message):
 if __name__ == '__main__':
 
     #test
-    send_message_to_discord('I am tartampion, and i am going to kick your ass')
+    CHANNEL_ID = int(os.environ['discord_channel_id_fire_alert_viirs'])  # Replace with your channel ID
+    send_message_to_discord('I am tartampion, and i am going to kick your ass', CHANNEL_ID)
+    CHANNEL_ID = int(os.environ['discord_channel_id_fire_alert_fci'])  # Replace with your channel ID
+    send_message_to_discord('I am tartampion, and i am going to kick your ass', CHANNEL_ID)
