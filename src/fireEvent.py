@@ -35,12 +35,13 @@ import ros as ROSlib
 importlib.reload(interpArrivalTime)
 importlib.reload(ROSlib)
 
+
 ##########################
 class Event: 
     _id_counter=0
 
 
-    def __init__(self, cluster, ctr, crs, hs_all): 
+    def __init__(self, cluster, ctr, crs, hs_all, gdf_postcode): 
         self.id_fire_event = Event._id_counter
         Event._id_counter += 1
         
@@ -50,6 +51,8 @@ class Event:
         self.ctrs  = gpd.GeoDataFrame([{'geometry':ctr.geometry}] ,crs=crs, geometry='geometry')
         self.centers = [Point(cluster.x, cluster.y)]
         self.frps = [cluster.frp]
+
+        self.fire_name = assign_single_fire_name(self, gdf_postcode)    
 
         #keep only the one that match self.times
         hsidx_ = cluster.indices_hs
@@ -73,6 +76,7 @@ class Event:
         #    plt.show()
 
         self.id_fire_event_dad = []
+
 
 
     def add(self, cluster, ctr, crs, hs_all):
@@ -109,8 +113,13 @@ class Event:
 
     def testSimilarityOfEvent(self, cluster, ctr):
         flag_frp_same = False
-        if abs(self.frps[-1] - cluster.frp )/ cluster.frp < .05 : 
-            flag_frp_same = True
+        if cluster.frp != 0 : 
+            if abs(self.frps[-1] - cluster.frp )/ cluster.frp < .05 : 
+                flag_frp_same = True
+        else: 
+            if abs(self.frps[-1] - cluster.frp ) <= 0 : 
+                flag_frp_same = True
+
         flag_geo_same= False
         if (self.ctrs.iloc[-1].geometry.geom_type == 'Polygon') and (ctr.geometry.geom_type == 'Polygon'): 
             if average_min_distance(self.ctrs.iloc[-1].geometry, ctr.geometry, symmetric=False) < 20 :
@@ -149,9 +158,12 @@ class Event:
         for i in idx_dad:
             self.id_fire_event_dad.append(i)
 
-    def save(self, status, params, datetime_now=None):
+    def save(self, status, params, datetime_now=None, local_dir=None):
         if status == 'active':
-            file_path = params['event']['dir_data']+'/Pickles_{:s}_{:s}/{:09d}.pkl'.format(status,datetime_now.strftime("%Y-%m-%d_%H%M"),self.id_fire_event)
+            if local_dir != None:
+                file_path = local_dir+'/Pickles_{:s}_{:s}/{:09d}.pkl'.format(status,datetime_now.strftime("%Y-%m-%d_%H%M"),self.id_fire_event)
+            else:
+                file_path = params['event']['dir_data']+'/Pickles_{:s}_{:s}/{:09d}.pkl'.format(status,datetime_now.strftime("%Y-%m-%d_%H%M"),self.id_fire_event)
         elif status == 'past':
             file_path = params['event']['dir_data']+'/Pickles_{:s}/{:09d}_{:s}.pkl'.format(status,self.id_fire_event,self.times[-1].strftime("%Y-%m-%d_%H%M"))
 
@@ -175,6 +187,8 @@ class Event:
         with open(file_path, 'wb') as f:
             pickle.dump(self, f)
 
+        if local_dir != None:
+            return file_path,  params['event']['dir_data']+'/Pickles_{:s}_{:s}/{:09d}.pkl'.format(status,datetime_now.strftime("%Y-%m-%d_%H%M"),self.id_fire_event)
 
 ##########################
 def load_fireEvent(file_path):
@@ -187,9 +201,11 @@ def load_fireEvent(file_path):
     Returns:
     - Event: The deserialized Event instance.
     """
-    with open(file_path, 'rb') as f:
-        return pickle.load(f)
-
+    try:
+        with open(file_path, 'rb') as f:
+            return pickle.load(f)
+    except: 
+        pdb.set_trace()
 
 ############################
 def load_fireEvents(params,currentTime): 
@@ -227,5 +243,52 @@ def average_min_distance(poly1, poly2, symmetric=True):
         return d1 
 
 
+###########################
+def assign_single_fire_name(self, gdf_postcode: gpd.GeoDataFrame) -> str:
+    """
+    Assign a fire_name to the last fire event using postcode spatial information.
+
+    Parameters
+    ----------
+    gdf_postcode : GeoDataFrame
+        Postcode boundaries with columns: 'geometry', 'NSI_CODE', 'COMM_NAME', 'CNTR_CODE', 'NUTS_CODE'.
+
+    Returns
+    -------
+    str
+        Generated fire_name string.
+    """
+    # Get last center and time
+    point = self.centers[-1]
+    time = pd.to_datetime(self.times[-1])
+
+    # Create temporary GeoDataFrame
+    gdf_point = gpd.GeoDataFrame(
+        [{'geometry': point, 'time': time}],
+        geometry='geometry',
+        crs=gdf_postcode.crs
+    )
+
+    # Spatial join
+    joined = gpd.sjoin(
+        gdf_point,
+        gdf_postcode[["geometry", "NSI_CODE", "COMM_NAME", "CNTR_CODE", "NUTS_CODE"]],
+        how="left",
+        predicate="intersects"
+    )
+
+    row = joined.iloc[0]  # Only one point
+
+    # Compose fire_name
+    fire_name = (
+        "fire_" +
+        (row["CNTR_CODE"] if pd.notnull(row["CNTR_CODE"]) else "XX") + "_" +
+        (str(row["NSI_CODE"]) if pd.notnull(row["NSI_CODE"]) else "00000") + "_" +
+        (row["COMM_NAME"].replace(" ", "") if pd.notnull(row["COMM_NAME"]) else "UnknownCity") + "_" +
+        (str(row["NUTS_CODE"]) if pd.notnull(row["NUTS_CODE"]) else "00000") + "_" +
+        time.strftime("%Y%m%d")
+    )
+
+    return fire_name
 
 

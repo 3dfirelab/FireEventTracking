@@ -1,30 +1,64 @@
+import os
+import certifi
+import ssl
+import aiohttp
+import logging
 import discord
-import asyncio
-import os 
+import requests
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-TOKEN = os.environ['discord_token_fire_alert'] 
+# Disable discord.py logs
+for logger_name in ['discord', 'discord.client', 'discord.gateway', 'discord.http']:
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.CRITICAL)
+    logger.propagate = False
+    logger.handlers.clear()
 
-###############################
+TOKEN = os.environ['discord_token_fire_alert']
+
 def send_message_to_discord(message, CHANNEL_ID):
 
+
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
     intents = discord.Intents.default()
-    client = discord.Client(intents=intents)
 
-    @client.event
-    async def on_ready():
-        print(f'Logged in as {client.user}')
-        channel = client.get_channel(CHANNEL_ID)
-        await channel.send(message)
-        await client.close()
+    class MyClient(discord.Client):
+        async def setup_hook(self):
+            # Patch the aiohttp connector inside the bot’s own event loop
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            self.http.connector = connector
 
+        async def on_ready(self):
+            try:
+                channel = self.get_channel(CHANNEL_ID)
+                if channel:
+                    await channel.send(message)
+            finally:
+                await self.close()
+
+    client = MyClient(intents=intents)
     client.run(TOKEN)
 
 
-if __name__ == '__main__':
 
-    #test
-    CHANNEL_ID = int(os.environ['discord_channel_id_fire_alert_viirs'])  # Replace with your channel ID
-    send_message_to_discord('I am tartampion, and i am going to kick your ass', CHANNEL_ID)
-    CHANNEL_ID = int(os.environ['discord_channel_id_fire_alert_fci'])  # Replace with your channel ID
-    send_message_to_discord('I am tartampion, and i am going to kick your ass', CHANNEL_ID)
+def send_message_to_discord_viaAeris(message, channel):
+
+    url = f'https://api.sedoo.fr/aeris-euburn-silex-rest/discord/sendMessage/{channel}'
+    headers = {
+    'accept': '*/*',
+    'Content-Type': 'application/json',
+    }
+    data = message
+    response = requests.post(url, headers=headers, data=data, verify=False)
+    #print(response.text)
+    return response.status_code
+
+
+if __name__ == '__main__':
+    channel= 'silex-fire-alert-fci'   #int(os.environ['discord_channel_id_fire_alert_fci'])
+    send_message_to_discord_viaAeris('Message for FCI', channel)
+    channel= 'silex-fire-alert-viirs' #int(os.environ['discord_channel_id_fire_alert_viirs'])
+    send_message_to_discord_viaAeris('Message for VIIRS', channel)
+

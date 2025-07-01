@@ -119,14 +119,6 @@ def load_hs4lastObsAllSat(day,hour,params):
         elif len(hsfiles)==0:
             continue
    
-    try:
-        if params['general']['sensor'] == 'FCI':
-            df.rename(columns={'LONGITUDE': 'longitude'}, inplace=True)
-            df.rename(columns={'LATITUDE': 'latitude'}, inplace=True)
-            df.rename(columns={'FRP': 'frp'}, inplace=True)
-    except: 
-        pdb.set_trace()
-
     if df is None:
         if params['general']['sensor'] == 'VIIRS':
             columns = [
@@ -143,6 +135,15 @@ def load_hs4lastObsAllSat(day,hour,params):
 
         # Create the empty DataFrame
         return  pd.DataFrame(columns=columns)
+    
+    try:
+        if params['general']['sensor'] == 'FCI':
+            df.rename(columns={'LONGITUDE': 'longitude'}, inplace=True)
+            df.rename(columns={'LATITUDE': 'latitude'}, inplace=True)
+            df.rename(columns={'FRP': 'frp'}, inplace=True)
+    except: 
+        pdb.set_trace()
+
 
 
     # Create geometry column

@@ -9,7 +9,8 @@ from pathlib import Path
 import importlib 
 from datetime import datetime, timezone, timedelta
 from sklearn.cluster import DBSCAN
-from shapely.geometry import Point, MultiPoint
+from shapely.geometry import Point, MultiPoint, Polygon, MultiPolygon
+from shapely.ops import unary_union
 import geopandas as gpd
 import pdb 
 import alphashape
@@ -30,6 +31,9 @@ import xarray as xr
 from rasterio.features import rasterize
 from scipy.ndimage import binary_dilation
 from concurrent.futures import ThreadPoolExecutor
+from pyproj import Transformer
+import tempfile
+from multiprocessing import Pool
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -78,6 +82,7 @@ def mount_sftp_with_sshfs(mount_point):
 #############################
 def create_gdf_fireEvents(params,fireEvents):
     
+    '''
     filtered_fireEvents = [x for x in fireEvents if x is not None]
     
     gdf_activeEvent = pd.concat( [fireEvent.ctrs.iloc[-1:] for fireEvent in  filtered_fireEvents] ).reset_index().drop(columns=['index'])
@@ -90,6 +95,41 @@ def create_gdf_fireEvents(params,fireEvents):
 
     eurostat_postcode_boundaries = gpd.read_file(params['general']['root_data']+'/'+params['event']['eurostat'])
     gdf_activeEvent = assign_fire_names_from_postcode(gdf_activeEvent, eurostat_postcode_boundaries)
+    '''
+        
+    # Filter out None values
+    filtered_fireEvents = [x for x in fireEvents if x is not None]
+
+    crs = filtered_fireEvents[0].ctrs.crs
+
+    # Extract data
+    geometries = []
+    times = []
+    centers = []
+    frps = []
+    ids = []
+    names = []
+
+    for fe in filtered_fireEvents:
+        last_ctr = fe.ctrs.iloc[-1]
+        geometries.append(last_ctr.geometry)
+        times.append(fe.times[-1])
+        centers.append(fe.centers[-1])
+        frps.append(fe.frps[-1])
+        ids.append(fe.id_fire_event)
+        names.append(fe.fire_name)
+
+    # Construct GeoDataFrame
+    gdf_activeEvent = gpd.GeoDataFrame({
+        'time': times,
+        'center': centers,
+        'frp': frps,
+        'id_fire_event': ids,
+        'name': names,
+        'geometry': geometries
+    }, geometry='geometry', crs=crs)
+
+    gdf_activeEvent = gdf_activeEvent.set_index('id_fire_event')
 
     return gdf_activeEvent
 
@@ -167,9 +207,9 @@ def init(config_name, sensorName, log_dir):
     params['general']['sensor'] = sensorName
 
     if params['general']['sensor'] == 'FCI':
-        params['general']['discord_channel']=int(os.environ['discord_channel_id_fire_alert_fci'])
+        params['general']['discord_channel']= 'silex-fire-alert-fci'   #int(os.environ['discord_channel_id_fire_alert_fci'])
     elif params['general']['sensor'] == 'VIIRS':
-        params['general']['discord_channel']=int(os.environ['discord_channel_id_fire_alert_viirs'])
+        params['general']['discord_channel']= 'silex-fire-alert-viirs' #int(os.environ['discord_channel_id_fire_alert_viirs'])
 
     if socket.gethostname() == 'moritz': 
         params['hs']['dir_data'] = params['hs']['dir_data'].replace('/mnt/data3/','/mnt/dataEstrella2/')
@@ -236,8 +276,7 @@ def filter_points_by_mask(gdf: gpd.GeoDataFrame, mask_da: xr.DataArray, mask_val
 
 ####################################################
 def cache_file(params, fireEvents_files, max_workers=16):
-    local_dir = "/tmp/paugamr/fireEvents_local_{params['general']['sensor']}/"
-    os.makedirs(local_dir, exist_ok=True)
+    local_dir = tempfile.mkdtemp()
 
     def copy_to_local(remote_file):
         local_path = os.path.join(local_dir, os.path.basename(remote_file))
@@ -251,7 +290,30 @@ def cache_file(params, fireEvents_files, max_workers=16):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         local_paths = list(executor.map(copy_to_local, fireEvents_files))
 
-    return local_paths
+    return local_paths, local_dir
+            
+
+####################################################
+def post_on_discord(params,event):
+    if 'fire_FR' not in event.fire_name:
+        return None
+    transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
+
+    pt = event.centers[-1]
+    x, y = pt.x, pt.y 
+    lon, lat = transformer.transform(x,y)
+    url = f"https://www.openstreetmap.org/?mlat={lat:.6f}&mlon={lon:.6f}#map=14/{lat:.6f}/{lon:.6f}"
+    loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tOpenStreetMap: {url}"
+    discordMessage.send_message_to_discord_viaAeris(
+                                            f"FET: new Fire from {params['general']['sensor']}"+\
+                                            f"\n\t\tfrp: {event.frps[-1]:.2f} MW"+\
+                                            f'\n\t\ttime: {event.times[-1]}'+\
+                                            f'\n\t\tcenter: {loc}'+\
+                                            f'\n\t\tarea: {1.e-4*event.areas[-1]:.2f} ha' , 
+                                        params['general']['discord_channel']
+                                                   )
+    return None 
+
 
 ####################################################
 #def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
@@ -259,6 +321,8 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
     
     start_datetime = datetime.strptime(f'{start_datetime}', '%Y-%m-%d_%H%M' ).replace(tzinfo=timezone.utc)
     #end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+    
+    gdf_postcode = gpd.read_file(params['general']['root_data']+'/'+params['event']['eurostat'])
 
     '''
     if params['event']['file_HSDensity_ESAWorldCover'] != 'None': 
@@ -401,7 +465,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 pdb.set_trace()
             fireEvents_files = sorted(glob.glob( params['event']['dir_data']+'/Pickles_{:s}_{:s}/*.pkl'.format('active', start_time_last_available.strftime("%Y-%m-%d_%H%M"))))
             
-            local_fireEvents_files = cache_file(params, fireEvents_files)
+            local_fireEvents_files, local_dir = cache_file(params, fireEvents_files)
             ii = 0
             for id_, event_file in enumerate(local_fireEvents_files):
                 event = fireEvent.load_fireEvent(event_file)
@@ -412,7 +476,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 fireEvents.append( event ) 
                 ii += 1
             fireEvent.Event._id_counter = fireEvents[-1].id_fire_event +1
-            shutil.rmtree(os.path.dirname(local_fireEvents_files[0])) 
+            shutil.rmtree(local_dir)
 
             # Set your directory and threshold date
             directory_past = params['event']['dir_data']+'/Pickles_{:s}/'.format('past')
@@ -591,9 +655,17 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             x=('x', 'mean'),
             start_time=('timestamp', 'min'),
             end_time=('timestamp', 'max'),
-            frp=('frp', 'sum'),  # Assuming FRP (Fire Radiative Power) is present
+            #frp=('frp', 'sum'),  # Assuming FRP (Fire Radiative Power) is present
             indices_hs=('original_index', lambda x: list(x))  # Collect indices into a list
         ).reset_index()
+
+        #compute FRP per cluster using only the last hotspot
+        frp_cluster = []
+        for icluster, cluster in fireCluster.iterrows():
+            idx_valid_hs = hsgdf_all.iloc[fireCluster['indices_hs'][icluster]]['timestamp'] >= np.datetime64(date_now.replace(tzinfo=None))
+            frp_ = hsgdf_all.iloc[fireCluster['indices_hs'][icluster]].frp[idx_valid_hs].sum()
+            frp_cluster.append(frp_)
+        fireCluster['frp'] = frp_cluster
 
         fireCluster.loc[:,['duration']] = (fireCluster['end_time']-fireCluster['start_time']).dt.total_seconds()/(24*3600) 
         fireCluster['center'] = [Point(xx,yy) for xx,yy in zip( fireCluster.x, fireCluster.y ) ]
@@ -638,17 +710,22 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         # Create GeoDataFrame of alpha shapes per event
         alpha_shape_gdf = gpd.GeoDataFrame(alpha_shapes, crs=hsgdf_all.crs)
         fireCluster_ctr = alpha_shape_gdf
-       
+            
+        #ensure poly are convex
+        fireCluster_ctr['geometry'] = fireCluster_ctr['geometry'].apply(make_convex)
+ 
+        #keep only cluster with at least one hs from dat_now
+        idxs = fireCluster['end_time'] >= np.datetime64(date_now.replace(tzinfo=None))
+        fireCluster =  fireCluster[idxs]
+        fireCluster_ctr = fireCluster_ctr[idxs]
+
         if len(fireEvents) == 0: 
             #if no fire event were initialized, we set all cluster as fire event
             print(' create ', end=' |')
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
-                event = fireEvent.Event(cluster,ctr,fireCluster.crs,hsgdf_all_raw) 
+                event = fireEvent.Event(cluster,ctr,fireCluster.crs,hsgdf_all_raw,gdf_postcode) 
                 fireEvents.append(event)
-                discordMessage.send_message_to_discord(
-                     f'FET: new Fire\n\tfrp: {event.frps[-1]}\n\ttime: {event.times[-1]}\n\tcenter: {event.centers[-1]}\n\tarea: {1.e-4*event.areas[-1]:.2f} ha', 
-                                                       params['general']['discord_channel']
-                                                    )
+                post_on_discord(params,event)
                 #if event.id_fire_event == 242: pdb.set_trace()
 
         else: 
@@ -781,15 +858,9 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 #if 14634 in cluster.indices_hs: pdb.set_trace()
                 #if cluster.frp in gdf_activeEvent['frp'].values: pdb.set_trace()
                 #print('????????????????? new event')
-                new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw) 
+                new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw,gdf_postcode) 
                 fireEvents.append(new_event)
-                try:
-                    discordMessage.send_message_to_discord(
-                     f'FET: new Fire\n\tfrp: {new_event.frps[-1]}\n\ttime: {new_event.times[-1]}\n\tcenter: {new_event.centers[-1]}\n\tarea: {1.e-4*new_event.areas[-1]:.2f} ha', 
-                                                           params['general']['discord_channel']
-                                                        )
-                except: 
-                    pdb.set_trace()
+                post_on_discord(params,new_event)
                 #if new_event.id_fire_event == 242: pdb.set_trace()
 
         #remove fireEvent that were updated more than two day ago. 
@@ -829,7 +900,8 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             #gdf_to_gpkgfile(gdf_activeEvent, params, end_datetime, 'firEvents')
             gdf_to_geojson(gdf_activeEvent.to_crs(4326), params, start_datetime, 'firEvents')
             gdf_to_gpkgfile(hsgdf_all_raw, params, start_datetime, 'hotspots')
-            
+        
+        '''
         for id_, event in enumerate(fireEvents):
             if event is not None: 
                 event.save( 'active', params, start_datetime)
@@ -839,8 +911,51 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 ax.plot(event.times, event.frps, marker='o', linestyle='-')
                 ax.set_xlabel('time')
                 ax.set_ylabel('FRP (MW)')
-                fig.savefig(f"{params['event']['dir_frp']:s}/{event.id_fire_event:09d}.png")
+                fig.savefig(f"{params['event']['dir_frp']:s}/{event.id_fire_event:09d}.png",dpi=100)
                 plt.close(fig)
+        '''
+
+        # Create a temporary directory for storing plots
+        tmp_dir = tempfile.mkdtemp()
+
+        # Collect tasks for parallel copy
+        copy_tasks = []
+
+        dir_Pkl = None
+        # Loop over fire events
+        for id_, event in enumerate(fireEvents):
+            if event is not None:
+                # Save metadata or internal state
+                
+                tmp_filePkl, dest_filePkl = event.save('active', params, start_datetime, local_dir=tmp_dir)
+                copy_tasks.append((tmp_filePkl, dest_filePkl))
+                if dir_Pkl == None: dir_Pkl = os.path.dirname(dest_filePkl)
+                # Create and save the FRP time series plot in temporary dir
+                fig = plt.figure(figsize=(10, 5))
+                ax = plt.subplot(111)
+                ax.plot(event.times, event.frps, marker='o', linestyle='-')
+                ax.set_xlabel('time')
+                ax.set_ylabel('FRP (MW)')
+
+                # File paths
+                tmp_file = os.path.join(tmp_dir, f"{event.id_fire_event:09d}.png")
+                dest_file = os.path.join(params['event']['dir_frp'], f"{event.id_fire_event:09d}.png")
+                
+                # Save figure and close
+                fig.savefig(tmp_file, dpi=100)
+                plt.close(fig)
+
+                # Add to copy task list
+                copy_tasks.append((tmp_file, dest_file))
+       
+        os.makedirs(dir_Pkl, exist_ok=True)
+        # Parallel copy using multiprocessing
+        with Pool(processes=16) as pool:
+            pool.map(copy_file, copy_tasks)
+
+        # Optional cleanup (uncomment to remove temp dir after copy)
+        shutil.rmtree(tmp_dir)
+    
 
         if flag_PastFireEvent:
             print('  FireEvents saved: active: {:6d}  past: {:6d}'.format(count_not_none(fireEvents), len(pastFireEvents)))
@@ -853,6 +968,24 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
 
 
     return start_datetime, fireEvents, pastFireEvents
+
+
+###############################################
+def make_convex(geom):
+    if isinstance(geom, Polygon):
+        return geom.convex_hull
+    elif isinstance(geom, MultiPolygon):
+        # Combine all parts then get the convex hull
+        return unary_union(geom).convex_hull
+    else:
+        return geom  # Leave Point, LineString, etc., unchanged
+
+
+###############################################
+# Function to copy a single file (for multiprocessing)
+def copy_file(task):
+    src, dst = task
+    shutil.copy2(src, dst)
 
 ##############################################
 def gdf_to_gpkgfile(gdf_activeEvent, params, datetime_, name_):
@@ -1004,12 +1137,17 @@ def run_fire_tracking(args):
         else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         
-        end = datetime.strptime('2025-06-27_0430', '%Y-%m-%d_%H%M')
-        #if params['general']['sensor'] == 'VIIRS':
-        #    end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
-        #elif params['general']['sensor'] == 'FCI':
-        #    end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(minutes=20)
-  
+        #end = datetime.strptime('2025-06-27_0530', '%Y-%m-%d_%H%M')
+        if params['general']['sensor'] == 'VIIRS':
+            end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
+        elif params['general']['sensor'] == 'FCI':
+            end = (datetime.now(timezone.utc) - timedelta(minutes=20))
+            # Round down to the nearest xx:00 or xx:30
+            end = end.replace(second=0, microsecond=0)
+            if end.minute < 30:
+                end = end.replace(minute=0)
+            else:
+                end = end.replace(minute=30) 
     else:
         print('missing inputName')
         sys.exit()
@@ -1087,10 +1225,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    run_fire_tracking(args)
+
+    '''
     import cProfile
     import pstats
     cProfile.run('run_fire_tracking(args)', 'profile_output')
 
     p = pstats.Stats('profile_output')
     p.strip_dirs().sort_stats('cumtime').print_stats(20)
-
+    '''

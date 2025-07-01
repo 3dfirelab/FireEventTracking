@@ -1,5 +1,4 @@
 #!/bin/bash
-
 source ~/.myKeys.sh
 export srcDir=/home/paugamr/Src/FireEventTracking/src
 "$srcDir"/mount_aeris.sh

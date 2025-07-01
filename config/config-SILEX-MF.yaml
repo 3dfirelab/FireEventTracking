@@ -12,7 +12,7 @@ event:
   dir_data: ORIGIN/fire_events 
   dir_geoJson: ORIGIN/fire_events/GeoJson
   dir_frp: ORIGIN/fire_events/FRP
-  start_time: '2025-06-27_0000'
+  start_time: '2025-06-28_0000'
   mask_HS: mask_hs_600m_europe.nc
   eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
 postproc:
