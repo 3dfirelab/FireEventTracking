@@ -34,6 +34,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pyproj import Transformer
 import tempfile
 from multiprocessing import Pool
+import polyline 
+import requests 
+import json 
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -294,26 +297,67 @@ def cache_file(params, fireEvents_files, max_workers=16):
             
 
 ####################################################
-def post_on_discord(params,event):
+def post_on_discord_and_runffMNH(params,event):
     if 'fire_FR' not in event.fire_name:
         return None
     transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
+    bell = "\U0001F514"
 
     pt = event.centers[-1]
     x, y = pt.x, pt.y 
     lon, lat = transformer.transform(x,y)
-    url = f"https://www.openstreetmap.org/?mlat={lat:.6f}&mlon={lon:.6f}#map=14/{lat:.6f}/{lon:.6f}"
-    loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tOpenStreetMap: {url}"
+    ffmnh_info = run_ffMNH_corte(params, event, lon, lat)
+    if ffmnh_info is not None:
+        url = f"https://forefire.univ-corse.fr/firecast/{ffmnh_info['path']}"
+        loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tForeFireMNH Simulation: {url}"
+    else:
+        url = f"https://www.openstreetmap.org/?mlat={lat:.6f}&mlon={lon:.6f}#map=14/{lat:.6f}/{lon:.6f}"
+        loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tOpen Street Map loc: {url}"
+        
+    
     discordMessage.send_message_to_discord_viaAeris(
-                                            f"FET: new Fire from {params['general']['sensor']}"+\
+                                            bell+f"FET: new Fire from {params['general']['sensor']}"+\
                                             f"\n\t\tfrp: {event.frps[-1]:.2f} MW"+\
                                             f'\n\t\ttime: {event.times[-1]}'+\
+                                            f"\n\t\tpostcode-commune: {'-'.join(event.fire_name.split('_')[2:4])}"+\
                                             f'\n\t\tcenter: {loc}'+\
                                             f'\n\t\tarea: {1.e-4*event.areas[-1]:.2f} ha' , 
                                         params['general']['discord_channel']
                                                    )
-    return None 
 
+    return ffmnh_info
+
+
+####################################################
+def run_ffMNH_corte(params, event, lon, lat):
+    
+    url = "https://forefire.univ-corse.fr/simapi/forefireAPI.php"
+
+    data = {
+        'command': 'init',
+        'path': f'ronanSilex{event.id_fire_event}',
+        'coords': f'{polyline.encode([(lat,lon)])}',
+        'ventX': '0',
+        'ventY': '0',
+        'date': event.times[-1].strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'model': 'Rothermel',
+        'apikey': 'DEMO',
+        'message': 'QUICK800'
+    }
+    print(f'ronanSilex{event.id_fire_event}')
+    print(polyline.encode([(lat,lon)]))
+    print(event.times[-1].strftime('%Y-%m-%dT%H:%M:%SZ'))
+
+    response = requests.post(url, data=data)
+
+    # Check the response
+    #print("Status Code:", response.status_code)
+    #print("Response Text:", response.text)
+  
+    if response.status_code == 200:
+        return json.loads(response.text)
+    else: 
+        return None
 
 ####################################################
 #def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
@@ -548,7 +592,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         #load last obs
         hsgdf = hstools.load_hs4lastObsAllSat(day,hour,params)
         if len(hsgdf)==0: 
-            print('skip  ')
+            print('skip [no hs]  ', end='')
             date_now = date_now + timedelta(minutes=dt_minutes_perimeters)    
             idate+=1
             continue
@@ -573,7 +617,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         n_hs_before_filter = len(hsgdf)
         if maskHS_da is not None: hsgdf = filter_points_by_mask(hsgdf, maskHS_da )
         if len(hsgdf)==0: 
-            print(' skip  ')
+            print(' skip  [no hs after fixhs filter] ')
             date_now = date_now + timedelta(minutes=dt_minutes_perimeters)    
             idate+=1
             continue
@@ -725,7 +769,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
                 event = fireEvent.Event(cluster,ctr,fireCluster.crs,hsgdf_all_raw,gdf_postcode) 
                 fireEvents.append(event)
-                post_on_discord(params,event)
+                post_on_discord_and_runffMNH(params,event)
                 #if event.id_fire_event == 242: pdb.set_trace()
 
         else: 
@@ -860,7 +904,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 #print('????????????????? new event')
                 new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw,gdf_postcode) 
                 fireEvents.append(new_event)
-                post_on_discord(params,new_event)
+                post_on_discord_and_runffMNH(params,new_event)
                 #if new_event.id_fire_event == 242: pdb.set_trace()
 
         #remove fireEvent that were updated more than two day ago. 
@@ -1160,6 +1204,11 @@ def run_fire_tracking(args):
     print(start)
     print(end)
     print('######################')
+   
+    if start == end: 
+        print('end == start: stop here')
+        sys.exit()
+    
     maskHS_da = None
     if 'mask_HS' in params['event']:
         if os.path.isfile(f"{src_dir}/../data_local/{params['event']['mask_HS']}"):
@@ -1215,6 +1264,7 @@ if __name__ == '__main__':
     SILEX
     domain: -10,35,20,46
     '''
+    print('FET start!')
     importlib.reload(hstools)
     src_dir = os.path.dirname(os.path.abspath(__file__))
   
@@ -1227,6 +1277,7 @@ if __name__ == '__main__':
 
     run_fire_tracking(args)
 
+    print('FET done!')
     '''
     import cProfile
     import pstats

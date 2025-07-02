@@ -16,6 +16,10 @@ import cartopy.feature as cfeature
 import xarray as xr 
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pandas as pd 
+from matplotlib.gridspec import GridSpec
+import sys 
+from matplotlib.colors import ListedColormap, BoundaryNorm
+
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -69,6 +73,18 @@ def subset_from_ds(ds, varname,  x_center, y_center, time_sub, half_width_km=25)
     return subset, lon_min, lon_max, lat_min, lat_max
 
 
+def decimal_to_dms(decimal_degree):
+    is_positive = decimal_degree >= 0
+    decimal_degree = abs(decimal_degree)
+    degrees = int(decimal_degree)
+    minutes_full = (decimal_degree - degrees) * 60
+    minutes = int(minutes_full)
+    seconds = round((minutes_full - minutes) * 60, 2)
+
+    if not is_positive:
+        degrees = -degrees
+
+    return degrees, minutes, seconds
 
 inputName ='SILEX-MF'
 sensorName = 'FCI'
@@ -94,37 +110,57 @@ gdf_france = gdf[gdf["name"].str.contains("_FR_", na=False)].copy()
 gdf_france = gdf_france.to_crs(epsg=3857)
 gdf_france["area_km2"] = gdf_france.geometry.area / 1e6  # convert m² to km²
 
+
+dir_pof = '/home/paugamr/data/POF' 
+time_report.strftime('%Y%m%d')
+file_latest_pof = f"{dir_pof}/POF_1KM_MF_{(time_report-pd.Timedelta(days=1)).strftime('%Y%m%d')}_FC.nc"
+ds_pof = xr.open_dataset(file_latest_pof)
+
+# Your color list
+cols = ['#8ba9b3', '#edcc00', '#edcc00', '#e57d0f', '#e57d0f', '#e57d0f',
+        '#e57d0f', '#e57d0f', '#e57d0f', '#e21819', '#e21819', '#e21819',
+        '#e21819', '#e21819', '#000000', '#000000']
+# Your levels
+levels = np.arange(17) / 2500  # 17 boundaries define 16 intervals
+# Create colormap and norm
+cmap = ListedColormap(cols)
+norm = BoundaryNorm(levels, ncolors=cmap.N)
+
+
 # Sort by FRP descending and keep top 10
 top_fires = gdf_france.sort_values("frp", ascending=False).head(10)
+transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
 
 # Create PDF
 with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
 
     # Page 1: Summary Table
-    fig, ax = plt.subplots(figsize=(13, 6))
-    ax.axis('off')
-    ax.set_title(f"Top 10 Fire Events in France by FRP\nwithin the last 30min time window processed starting at {time_last_geojson}", fontsize=14, weight='bold')
+    fig = plt.figure(figsize=(8, 11))  # A4 landscape
+    gs = GridSpec(2, 2, figure=fig)
 
-    # Table content
-    table_data = [["Name", "last obs", "FRP(MW)", "Area(km²)"]]
+
+    # Table
+    ax_table = fig.add_subplot(gs[0, : ])
+    ax_table.axis('off')
+
+    table_data = [["Name", "Last Obs", "FRP (MW)", "Area (km²)"]]
     for _, row in top_fires.iterrows():
         table_data.append([
-            row["name"],
-            row["time"],
+            ' '.join(row["name"].split('_')[2:4]),
+            row["time"].strftime('%Y-%m-%d %H:%S'),
             f"{row['frp']:.2f}",
             f"{row['area_km2']:.2f}"
         ])
 
-    # Render table
-    table = ax.table(cellText=table_data[1:],  # data rows only
-                     colLabels=table_data[0],  # header row
-                     cellLoc='left',
-                     loc='center')
+    table = ax_table.table(
+        cellText=table_data[1:],
+        colLabels=table_data[0],
+        cellLoc='left',
+        loc='center'
+    )
 
     table.auto_set_font_size(False)
-
-    # Wider first column (name), narrower others
-    col_widths = [0.5, 0.3, 0.1, 0.1]
+    col_widths = [0.45, 0.3, 0.15, 0.2]
     n_rows = len(table_data)
     n_cols = len(table_data[0])
 
@@ -133,29 +169,65 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
             cell = table[(row, col)]
             cell.set_width(col_widths[col])
             if row == 0:
-                cell.set_fontsize(12)
+                cell.set_fontsize(10)
                 cell.set_text_props(weight='bold')
             else:
                 cell.set_fontsize(9)
 
-    table.scale(1.0, 1.5)
+    table.scale(0.9, 1.4)
 
-    active_fires_count = len(gdf_france)
-    ax.text(0.01, -0.05,
-            f"Number of active fires in France: {active_fires_count} "
-            "(a fire is considered active in the current version of FET if it has had at least one observation within the last 2 days)",
-            fontsize=10, ha='left', transform=ax.transAxes)
+# Active fires info
+    ax_table.text(
+        0.2, -0.1,
+        f"Number of active fires in France: {len(gdf_france)}\n"
+        "(A fire is considered active in the current version of FET\n"
+        "if it has at least one observation within the last 2 days)",
+        fontsize=10, ha='left'
+    )
+    ax_table.text(0.5,0.9,
+        f"Top 10 Fire Events in France by FRP\nwithin the last 30min time window processed\nstarting at {time_last_geojson}",
+        fontsize=14, weight='bold', ha='center'
+    )
 
+    # Map
+    loc_fire_top = []
+    for _, row in top_fires.iterrows():
+        pt = wkt_loads(row.center)
+        x, y = pt.x, pt.y
+        lon, lat = transformer.transform(x,y)
+        loc_fire_top.append([lon,lat])
+    loc_fire_top = np.array(loc_fire_top)
+    loc_fire_all = []
+    for _, row in gdf_france.iterrows():
+        pt = wkt_loads(row.center)
+        x, y = pt.x, pt.y
+        lon, lat = transformer.transform(x,y)
+        loc_fire_all.append([lon,lat])
+    loc_fire_all = np.array(loc_fire_all)
 
+    ax_map = fig.add_subplot(gs[1, 0], projection=ccrs.PlateCarree())
+    ax_map.set_extent([-6, 10.5, 41, 51.5], crs=ccrs.PlateCarree())
+    ax_map.add_feature(cfeature.LAND, facecolor='lightgray')
+    ax_map.add_feature(cfeature.OCEAN, facecolor='lightblue')
+    ax_map.add_feature(cfeature.COASTLINE)
+    ax_map.add_feature(cfeature.BORDERS, linestyle=':')
+    ax_map.scatter(loc_fire_top[:,0], loc_fire_top[:,1], color='red', s=10, label='top10')
+    ax_map.scatter(loc_fire_all[:,0], loc_fire_all[:,1], color='red', s=10, label='all active', alpha=0.5)
+    plt.legend()
+    
+    ax_map = fig.add_subplot(gs[1, 1], projection=ccrs.PlateCarree())
+    ax_map.set_extent([-6, 10.5, 41, 51.5], crs=ccrs.PlateCarree())
+    #ax_map.add_feature(cfeature.LAND, facecolor='lightgray')
+    #ax_map.add_feature(cfeature.OCEAN, facecolor='lightblue')
+    ax_map.add_feature(cfeature.COASTLINE)
+    ax_map.add_feature(cfeature.BORDERS, linestyle=':')
+
+    pof_now = ds_pof.sel(time=time_report,method='nearest')['MODEL_FIRE']
+    pof_now.plot(ax=ax_map, cmap=cmap, norm=norm)
+    ax_map.set_title(f'POF date={pof_now.time}')
     pdf.savefig(fig)
     plt.close(fig)
 
-    dir_pof = '/home/paugamr/data/POF' 
-    time_report.strftime('%Y%m%d')
-    file_latest_pof = f"{dir_pof}/POF_1KM_MF_{(time_report-pd.Timedelta(days=1)).strftime('%Y%m%d')}_FC.nc"
-    ds_pof = xr.open_dataset(file_latest_pof)
-    
-    transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
 
     for _, row in top_fires.iterrows():
         name = row["name"]
@@ -183,11 +255,25 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
         fig.suptitle(name, fontsize=14, weight='bold', y=0.98)
 
         # === 1. FRP Time Series (as image) ===
-        ax_frp = fig.add_axes([0.1, 0.73, 0.8, 0.2])  # [left, bottom, width, height]
+        ax_frp = fig.add_axes([0.15, 0.73, 0.8, 0.2])  # [left, bottom, width, height]
         ax_frp.imshow(frp_img)
         ax_frp.axis('off')
         ax_frp.set_title("FRP Time Series", fontsize=10)
-
+        
+        # === 1.1. cart location fire ===
+        ax_loc = fig.add_axes([0.05, 0.71, 0.25, 0.2], projection=ccrs.PlateCarree())
+        ax_loc.scatter(lon,lat, s=5, color='r')
+        #ax_loc.axis('off')
+        # Base map
+        ax_loc.add_feature(cfeature.COASTLINE)
+        ax_loc.add_feature(cfeature.BORDERS, linestyle=':')
+        ax_loc.add_feature(cfeature.LAND, facecolor='lightgray')
+        ax_loc.add_feature(cfeature.OCEAN, facecolor='lightblue')
+        ax_loc.set_extent([-6, 10.5, 41, 51.5], crs=ccrs.PlateCarree())
+        lat_dms = decimal_to_dms(lat)
+        lon_dms = decimal_to_dms(lon)
+        ax_loc.set_title(f"lon: {lon_dms[0]}°{lon_dms[1]}'{lon_dms[2]}\"\n"+f"lat: {lat_dms[0]}°{lat_dms[1]}'{lat_dms[2]}\"" ) 
+        
         # === 2. 2×2 Grid of Square imshow Panels ===
         imshow_size = 0.3  # square size for width and height
 
@@ -197,6 +283,7 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
         ]
         title_panel = ['POF', 'RGB', 'IR38', 'IR22']
         varname_panel = ['MODEL_FIRE', '', '', '' ]
+        title_panel = ['POF', '', '', '' ]
         cmap_panel = ['viridis', 'viridis', 'inferno', 'jet']
         for i, (left, bottom) in enumerate(positions):
             
@@ -247,7 +334,7 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
             cax.yaxis.set_ticks_position('left')
             cax.yaxis.set_label_position('left')
             #(\nCentered at ({lon:.4f}, {lat:.4f})')
-            ax.set_title(f'{varname_panel[i]} t={time_report}') 
+            ax.set_title(f"{title_panel[i]} t={pd.to_datetime(subset.time.values).strftime('%Y%m%dT%H:%MZ')}") 
 
 
         # === 3. Metadata ===
@@ -299,4 +386,4 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
     '''
 
 
-print("✅ PDF created: fires_in_france.pdf")
+print(f"✅ PDF created: {dir_report}/fires_FR_{time_last_geojson}.pdf")
