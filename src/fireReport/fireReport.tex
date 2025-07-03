@@ -1,0 +1,876 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage[margin=1in]{geometry}
+
+\begin{document}
+
+\vspace*{-1.5cm} % pull content toward the top (adjust as needed)
+\noindent
+\makebox[0pt][l]{\textbf{\LARGE SILEX Fire Report in France}}
+
+\vspace{1cm} % space after title
+
+\section{current status at 20250701T 11H:00MZ}
+Top 10 Fire Events in France by FRP within the last 30min time window processed starting at 20250701T 11H:00MZ
+\begin{table}[H]
+\centering
+\begin{tabular}{llcc}
+\toprule
+\textbf{Name} & \textbf{Last Obs} & \textbf{FRP (MW)} & \textbf{Area (km²)} \\
+\midrule
+2B143 Linguizzetta&2025-06-29 18:34&99.52&15.61\\
+36231 Velles&2025-06-29 17:48&66.40&4.02\\
+41148 Montlivault&2025-06-29 15:48&61.17&0.00\\
+57602 Rurange-lès-Thionville&2025-06-29 12:02&45.50&0.00\\
+01366 Sainte-Julie&2025-07-01 10:52&36.78&0.00\\
+47011 Anthé&2025-06-29 15:48&31.89&0.00\\
+21513 Quemigny-Poisot&2025-06-29 12:48&30.78&0.00\\
+63193 Lempdes&2025-06-29 15:48&27.63&0.00\\
+83091 Pierrefeu-du-Var&2025-06-29 13:37&25.80&0.00\\
+02410 Largny-sur-Automne&2025-06-29 12:02&24.80&0.00\\
+
+\bottomrule
+\end{tabular}
+\end{table}
+\textbf{Number of active fires in France: 26 } \\
+(A fire is considered active in the current version of FET if it has at least one observation within the last 2 days)
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.455\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{general_scattterPlot.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.535\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{general_pof_j0.png} % Replace with actual PNG
+        \raisebox{4.4mm}{\includegraphics[width=.1275\linewidth]{general_pof_j0_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\section{Evolution POF over the next 3 days:}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{general_pof_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{general_pof_j2.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{general_pof_j3.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+
+\vspace{-1em}
+\section*{2B143 Linguizzetta}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc184.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T18:28Z\\FRP: 99.52 MW\\Area: 15.61 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp184.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_184_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_184_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_184_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_184_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_184_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_184_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_184_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_184_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_184_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_184_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{36231 Velles}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc376.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T17:08Z\\FRP: 66.40 MW\\Area: 4.02 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp376.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_376_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_376_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_376_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_376_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_376_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_376_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_376_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_376_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_376_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_376_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{41148 Montlivault}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc338.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T15:28Z\\FRP: 61.17 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp338.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_338_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_338_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_338_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_338_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_338_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_338_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_338_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_338_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_338_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_338_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{57602 Rurange-lès-Thionville}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc232.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T12:09Z\\FRP: 45.50 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp232.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_232_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_232_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_232_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_232_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_232_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_232_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_232_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_232_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_232_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_232_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{01366 Sainte-Julie}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc161.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250701T10:58Z\\FRP: 36.78 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp161.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_161_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_161_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_161_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_161_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_161_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_161_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_161_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_161_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_161_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_161_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{47011 Anthé}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc358.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T15:48Z\\FRP: 31.89 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp358.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_358_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_358_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_358_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_358_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_358_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_358_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_358_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_358_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_358_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_358_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{21513 Quemigny-Poisot}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc262.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T12:28Z\\FRP: 30.78 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp262.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_262_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_262_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_262_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_262_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_262_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_262_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_262_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_262_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_262_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_262_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{63193 Lempdes}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc349.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T15:38Z\\FRP: 27.63 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp349.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_349_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_349_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_349_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_349_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_349_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_349_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_349_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_349_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_349_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_349_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{83091 Pierrefeu-du-Var}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc281.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T13:08Z\\FRP: 25.80 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp281.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_281_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_281_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_281_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_281_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_281_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_281_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_281_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_281_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_281_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_281_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\section*{02410 Largny-sur-Automne}
+\vspace{-1em}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \raisebox{10mm}{\includegraphics[width=\linewidth]{loc256.png}}\\[-4ex]
+        \raisebox{20mm}{\parbox{\linewidth}{Last Obs:\\ \small 20250629T12:59Z\\FRP: 24.80 MW\\Area: 0.00 km}}
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.69\textwidth}
+        \centering
+         \raisebox{11mm}{\includegraphics[width=\linewidth]{frp256.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-2em}
+\subsection*{POF over next 3 days}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_256_j0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.31\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{pof_256_j1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.36\textwidth}
+        \centering
+        \includegraphics[width=0.85\linewidth]{pof_256_j2.png} % Replace with actual PNG
+        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_256_j2_colorbar.png}} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+
+\vspace{-1em}
+\subsection*{RGB over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_256_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_256_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{rgb_256_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\vspace{-1em}
+\subsection*{IR38 over last 3h}
+\vspace{-1em}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_256_h0.png} % Replace with actual PNG
+    \end{subfigure}
+    %\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_256_h1.png} % Replace with actual PNG
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{ir38_256_h2.png} % Replace with actual PNG
+    \end{subfigure}
+\end{figure}
+
+\end{document}
