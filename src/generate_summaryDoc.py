@@ -212,7 +212,7 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
     ax_map.add_feature(cfeature.COASTLINE)
     ax_map.add_feature(cfeature.BORDERS, linestyle=':')
     ax_map.scatter(loc_fire_top[:,0], loc_fire_top[:,1], color='red', s=10, label='top10')
-    ax_map.scatter(loc_fire_all[:,0], loc_fire_all[:,1], color='red', s=10, label='all active', alpha=0.5)
+    ax_map.scatter(loc_fire_all[:,0], loc_fire_all[:,1], color='m', s=10, label='all active', alpha=0.2)
     plt.legend()
     
     ax_map = fig.add_subplot(gs[1, 1], projection=ccrs.PlateCarree())
@@ -224,8 +224,8 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
 
     pof_now = ds_pof.sel(time=time_report,method='nearest')['MODEL_FIRE']
     pof_now.plot(ax=ax_map, cmap=cmap, norm=norm)
-    ax_map.set_title(f'POF date={pof_now.time}')
-    pdf.savefig(fig)
+    ax_map.set_title(f'POF date={pof_now.time.values}')
+    pdf.savefig(fig,dpi=100)
     plt.close(fig)
 
 
@@ -343,7 +343,7 @@ with PdfPages(f"{dir_report}/fires_FR_{time_last_geojson}.pdf") as pdf:
         ax_text.axis('off')
         ax_text.text(0.5, 0.5, metadata, ha='center', va='center', fontsize=10)
 
-        pdf.savefig(fig)
+        pdf.savefig(fig, dpi=100)
         plt.close(fig)
 
     '''
