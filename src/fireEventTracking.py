@@ -103,8 +103,10 @@ def create_gdf_fireEvents(params,fireEvents):
     # Filter out None values
     filtered_fireEvents = [x for x in fireEvents if x is not None]
 
-    crs = filtered_fireEvents[0].ctrs.crs
-
+    if len(filtered_fireEvents)>0:
+        crs = filtered_fireEvents[0].ctrs.crs
+    else: 
+        crs = params['general']['crs']
     # Extract data
     geometries = []
     times = []
@@ -112,7 +114,7 @@ def create_gdf_fireEvents(params,fireEvents):
     frps = []
     ids = []
     names = []
-
+    ffmnhUrl = []
     for fe in filtered_fireEvents:
         last_ctr = fe.ctrs.iloc[-1]
         geometries.append(last_ctr.geometry)
@@ -121,17 +123,34 @@ def create_gdf_fireEvents(params,fireEvents):
         frps.append(fe.frps[-1])
         ids.append(fe.id_fire_event)
         names.append(fe.fire_name)
+        try:
+            ffmnhUrl.append(fe.ffmnhUrl)
+        except: 
+            ffmnhUrl.append('none')
 
     # Construct GeoDataFrame
-    gdf_activeEvent = gpd.GeoDataFrame({
-        'time': times,
-        'center': centers,
-        'frp': frps,
-        'id_fire_event': ids,
-        'name': names,
-        'geometry': geometries
-    }, geometry='geometry', crs=crs)
+    if crs != None:
+        gdf_activeEvent = gpd.GeoDataFrame({
+            'time': times,
+            'center': centers,
+            'frp': frps,
+            'id_fire_event': ids,
+            'name': names,
+            'ffmnhUrl': ffmnhUrl,
+            'geometry': geometries
+        }, geometry='geometry', crs=crs)
+    else:
+        gdf_activeEvent = gpd.GeoDataFrame({
+            'time': times,
+            'center': centers,
+            'frp': frps,
+            'id_fire_event': ids,
+            'name': names,
+            'ffmnhUrl': ffmnhUrl,
+            'geometry': geometries
+        }, geometry='geometry')
 
+    
     gdf_activeEvent = gdf_activeEvent.set_index('id_fire_event')
 
     return gdf_activeEvent
@@ -299,6 +318,7 @@ def cache_file(params, fireEvents_files, max_workers=16):
 ####################################################
 def post_on_discord_and_runffMNH(params,event):
     if 'fire_FR' not in event.fire_name:
+        event.add_ffmnhSimu('none')
         return None
     transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
     bell = "\U0001F514"
@@ -310,10 +330,11 @@ def post_on_discord_and_runffMNH(params,event):
     if ffmnh_info is not None:
         url = f"https://forefire.univ-corse.fr/firecast/{ffmnh_info['path']}"
         loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tForeFireMNH Simulation: {url}"
+        event.add_ffmnhSimu(url)
     else:
         url = f"https://www.openstreetmap.org/?mlat={lat:.6f}&mlon={lon:.6f}#map=14/{lat:.6f}/{lon:.6f}"
         loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tOpen Street Map loc: {url}"
-        
+        event.add_ffmnhSimu('none')
     
     discordMessage.send_message_to_discord_viaAeris(
                                             bell+f"FET: new Fire from {params['general']['sensor']}"+\
@@ -348,14 +369,17 @@ def run_ffMNH_corte(params, event, lon, lat):
     print(polyline.encode([(lat,lon)]))
     print(event.times[-1].strftime('%Y-%m-%dT%H:%M:%SZ'))
 
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data, verify=False)
 
     # Check the response
     #print("Status Code:", response.status_code)
     #print("Response Text:", response.text)
   
     if response.status_code == 200:
-        return json.loads(response.text)
+        try: 
+            return json.loads(response.text)
+        except:     
+            return None
     else: 
         return None
 
@@ -519,7 +543,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 #fireEvents.append( fireEvent.load_fireEvent(event_file) ) 
                 fireEvents.append( event ) 
                 ii += 1
-            fireEvent.Event._id_counter = fireEvents[-1].id_fire_event +1
+            if ii > 0:  
+                fireEvent.Event._id_counter = fireEvents[-1].id_fire_event +1
+            else: 
+                pdb.set_trace()
             shutil.rmtree(local_dir)
 
             # Set your directory and threshold date
@@ -917,6 +944,9 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                     #for event in pastFireEvents:
                     #    if event.id_fire_event == 872: pdb.set_trace()
                     pastFireEvents.append(element)
+       
+        if len(fireEvents) == 0 : pdb.set_trace()
+
         gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
         
         #remove old hotspot older than 7 days
@@ -991,11 +1021,12 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
 
                 # Add to copy task list
                 copy_tasks.append((tmp_file, dest_file))
-       
-        os.makedirs(dir_Pkl, exist_ok=True)
-        # Parallel copy using multiprocessing
-        with Pool(processes=16) as pool:
-            pool.map(copy_file, copy_tasks)
+      
+        if dir_Pkl is not None:
+            os.makedirs(dir_Pkl, exist_ok=True)
+            # Parallel copy using multiprocessing
+            with Pool(processes=16) as pool:
+                pool.map(copy_file, copy_tasks)
 
         # Optional cleanup (uncomment to remove temp dir after copy)
         shutil.rmtree(tmp_dir)

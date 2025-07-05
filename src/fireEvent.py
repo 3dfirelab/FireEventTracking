@@ -111,6 +111,9 @@ class Event:
         #    self.hspots.iloc[-1:].plot(ax=ax)
         #    plt.show()
 
+    def add_ffmnhSimu(self, url):
+        self.ffmnhUrl=url
+
     def testSimilarityOfEvent(self, cluster, ctr):
         flag_frp_same = False
         if cluster.frp != 0 : 

@@ -41,6 +41,8 @@ if __name__== '__main__':
 
     os.makedirs(dirData+'MOCAGE/',exist_ok=True)
 
+    sensor = dirData.strip('/').split('/')[-1]
+
 # Load the NetCDF grid, bottom left corner location
     domain_name = 'MOCAGE'
     lon = np.arange(-26, 46+0.1, 0.1)
@@ -116,7 +118,7 @@ if __name__== '__main__':
     frp_series = xr.concat(frp_list, dim="time")
     frp_series.attrs["long_name"] = "Fire Radiative Power"
     frp_series.attrs["units"] = "MW"
-    frp_series.attrs["description"] = "Rasterized VIIRS FRP on curvilinear model grid"
+    frp_series.attrs["description"] = f"Rasterized {sensor} FRP on curvilinear model grid"
 
     frp_series.coords["lat"].attrs["standard_name"] = "latitude"
     frp_series.coords["lat"].attrs["units"] = "degrees_north"
