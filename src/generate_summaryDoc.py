@@ -15,6 +15,7 @@ import pdb
 from shapely.wkt import loads as wkt_loads
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from pyproj import Geod
 import xarray as xr 
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pandas as pd 
@@ -25,6 +26,14 @@ import subprocess
 import math
 import tempfile
 import shutil
+import rasterio
+from rasterio.plot import show
+from rasterio.enums import Resampling
+from rasterio.windows import from_bounds
+from rasterio.enums import Resampling
+from rasterio.warp import transform_bounds
+import pandas as pd
+
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -120,9 +129,14 @@ def generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE,XX_TIME_REPORT,fireP
         cwd=f"{params['general']['reportDir']}",
         check=True
     )
+    subprocess.run(
+        ['pdflatex', 'fireReport.tex'],
+        cwd=f"{params['general']['reportDir']}",
+        check=True
+    )
 
 ######################################################
-def firePage(params,XX_FIRE_NAME, XX_FIRE_LOC_MAP, XX_FIRE_FRP, XX_META_DATA, XX_FIRE_ID, XX_FFMNH_URL):
+def firePage(params,XX_FIRE_NAME, XX_FIRE_VEG_MAP, XX_FIRE_FRP, XX_META_DATA, XX_FIRE_ID, XX_FFMNH_URL):
 
     with open(params['general']['srcDir']+'/fireReport/template_fire.tex', 'rb') as f:
         lines = f.readlines()
@@ -132,8 +146,8 @@ def firePage(params,XX_FIRE_NAME, XX_FIRE_LOC_MAP, XX_FIRE_FRP, XX_META_DATA, XX
         if 'XX_FIRE_NAME' in decoded_line:
             decoded_line = decoded_line.replace('XX_FIRE_NAME', XX_FIRE_NAME)
             lines[ii] = decoded_line.encode('utf-8')  # store back as bytes
-        if 'XX_FIRE_LOC_MAP' in decoded_line:
-            decoded_line = decoded_line.replace('XX_FIRE_LOC_MAP', XX_FIRE_LOC_MAP)
+        if 'XX_FIRE_VEG_MAP' in decoded_line:
+            decoded_line = decoded_line.replace('XX_FIRE_VEG_MAP', XX_FIRE_VEG_MAP)
             lines[ii] = decoded_line.encode('utf-8')
         if 'XX_FIRE_FRP' in decoded_line:
             decoded_line = decoded_line.replace('XX_FIRE_FRP', XX_FIRE_FRP)
@@ -200,7 +214,7 @@ def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0
     ax_map.add_feature(cfeature.BORDERS, linestyle=':')
 
     ax_map.pcolormesh(pof_now.lon, pof_now.lat, pof_now, cmap=cmap, norm=norm)
-    ax_map.scatter(fireloc[0],fireloc[1], facecolor='none',edgecolor='k',s=80)
+    ax_map.scatter(fireloc[0],fireloc[1], facecolor='none',edgecolor='k',s=100, linewidth=2  )
     ax_map.set_title(f'POF date={pof_now.time.values} (j+{jid})',fontsize=20)
     fig.savefig(f"{params['general']['reportDir']}/{filename}")
     plt.close(fig)
@@ -224,9 +238,40 @@ def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0
 
 
 ############################
+def add_scalebar(ax, length_km, location=(0.1, 0.05), linewidth=3, text_offset=0.01):
+    """
+    Add a scale bar to a Cartopy map.
+
+    Parameters:
+    - ax: matplotlib Axes with Cartopy projection
+    - length_km: scale bar length in kilometers
+    - location: tuple (x, y) in axis fraction coordinates (0–1)
+    - linewidth: thickness of the scale line
+    - text_offset: vertical offset of text label (in axes fraction)
+    """
+    # Get extent in data coordinates (lon/lat)
+    lon_min, lon_max, lat_min, lat_max = ax.get_extent(ccrs.PlateCarree())
+
+    # Convert axis fraction coords to data coords
+    lon_start = lon_min + location[0] * (lon_max - lon_min)
+    lat_start = lat_min + location[1] * (lat_max - lat_min)
+
+    # Compute destination point at given distance using pyproj.Geod
+    geod = Geod(ellps="WGS84")
+    lon_end, lat_end, _ = geod.fwd(lon_start, lat_start, 90, length_km * 1000)  # azimuth 90° = east
+
+    # Plot scale bar
+    ax.plot([lon_start, lon_end], [lat_start, lat_start],
+            transform=ccrs.PlateCarree(), color='k', linewidth=linewidth, solid_capstyle='butt')
+
+    # Add label
+    ax.text((lon_start + lon_end) / 2, lat_start + text_offset * (lat_max - lat_min),
+            f'{length_km} km', transform=ccrs.PlateCarree(),
+            ha='center', va='bottom', fontsize=20)
+############################
 if __name__ == '__main__':
 ############################ 
-    inputName ='SILEX-MF'
+    inputName ='SILEX'
     sensorName = 'FCI'
     log_dir = os.path.dirname(os.path.abspath(__file__)) +'/../log_doc/'
 
@@ -256,32 +301,46 @@ if __name__ == '__main__':
     gdf_france["area_km2"] = gdf_france.geometry.area / 1e6  # convert m² to km²
 
 
+    #POF
+    #####
     dir_pof = f"{params['general']['root_data']}/POF"
     XX_TIME_REPORT = time_report.strftime('%Y%m%dT %HH:%MMZ')
     file_latest_pof = f"{dir_pof}/POF_1KM_MF_{(time_report-pd.Timedelta(days=1)).strftime('%Y%m%d')}_FC.nc"
     ds_pof = xr.open_dataset(file_latest_pof)
-
-# Your color list
+    # Your color list
     cols = ['#8ba9b3', '#edcc00', '#edcc00', '#e57d0f', '#e57d0f', '#e57d0f',
             '#e57d0f', '#e57d0f', '#e57d0f', '#e21819', '#e21819', '#e21819',
             '#e21819', '#e21819', '#000000', '#000000']
-# Your levels
+    # Your levels
     levels = np.arange(17) / 2500  # 17 boundaries define 16 intervals
-# Create colormap and norm
+    # Create colormap and norm
     cmap = ListedColormap(cols)
     norm = BoundaryNorm(levels, ncolors=cmap.N)
 
+    # CLC colorcode
+    legend_path = "/home/paugam/AERIS_2/CorineLandCover/u2018_clc2018_v2020_20u1_raster100m/Legend/CLC2018_CLC2018_V2018_20_QGIS.txt"
+    legend_df = pd.read_csv(
+        legend_path,
+        header=None,
+        names=['code', 'r', 'g', 'b', 'a', 'label']
+    )
+    # Create hex color from RGB
+    legend_df['color'] = legend_df.apply(
+        lambda row: "#{:02x}{:02x}{:02x}".format(row['r'], row['g'], row['b']),
+        axis=1
+    )
+    legend_df['code'] = legend_df['code'].astype(int)
 
-# Sort by FRP descending and keep top 10
+    # Sort by FRP descending and keep top 10
     top_fires = gdf_france.sort_values("frp", ascending=False).head(10)
     transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
 
-# Create PDF
+    # Create PDF
     
     XX_TABLE_HERE = ''
     for _, row in top_fires.iterrows():
         XX_TABLE_HERE +=\
-            ' '.join(row["name"].split('_')[2:4]) + '&' +\
+            f"\hyperref[sec:fireID{row['id_fire_event']}]"+"{" + ' '.join(row["name"].split('_')[2:4]) + '}' + '&' +\
             row["time"].strftime('%Y-%m-%d %H:%S')+ '&' +\
             f"{row['frp']:.2f}"+ '&' +\
             f"{row['area_km2']:.2f}" + '\\\\'
@@ -331,6 +390,7 @@ if __name__ == '__main__':
     ax_map.scatter(loc_fire_top[:,0], loc_fire_top[:,1], color='red', s=30, label='top10')
     ax_map.set_title(f'all active fire date={time_report}',fontsize=20)
     plt.legend()
+             
     fig.savefig(f"{params['general']['reportDir']}/general_scatterPlot.png")
     plt.close(fig)
    
@@ -379,43 +439,113 @@ if __name__ == '__main__':
         #    XX_FIRE_FRP=''
         
 
-        # === 1. Metadata ===
-        XX_METADATA = f"{time.strftime('%Y%m%dT%H:%MZ')}\\\\FRP: {frp:.2f} MW\\\\Area: {area:.2f} km"
 
         XX_FIRE_NAME = ' '.join(name.split('_')[2:4])
         XX_FIRE_LOC_MAP = f'loc{row["id_fire_event"]}.png'
+        XX_FIRE_VEG_MAP = f'veg{row["id_fire_event"]}.png'
 
         XX_FFMNH_URL = ffmnh_url
 
-        # === 1.1. cart location fire ===
+
+        # === 1.1. cart vegetation around fire ===
+        with rasterio.open(f"{params['general']['root_data']}/CorineLandCover/u2018_clc2018_v2020_20u1_raster100m/DATA/U2018_CLC2018_V2020_20u1.tif") as src:
+            # Reproject bounding box to raster CRS
+            lon_min, lon_max, lat_min, lat_max = bounding_box_km(lon, lat, half_side_km=5)
+            bbox_wgs84 = (lon_min, lat_min, lon_max, lat_max)
+            bbox_proj = transform_bounds("EPSG:4326", src.crs, *bbox_wgs84)
+            
+            # Compute window in raster coordinates
+            window = from_bounds(*bbox_proj, transform=src.transform)
+            
+            # Read data within window
+            vegetation_crop = src.read(1, window=window, resampling=Resampling.nearest)
+            
+            # Get updated transform for cropped array
+            transform_crop = src.window_transform(window)
+       
+        codes_in_crop = np.unique(vegetation_crop)
+        legend_filtered = legend_df[legend_df.index.isin(codes_in_crop)].sort_values("code")
+
+        cmap_veg = ListedColormap(legend_filtered['color'].values)
+        values_colorbar = np.append(legend_filtered.index, legend_filtered.index[-1] + 1)
+        norm_veg = BoundaryNorm(
+            values_colorbar,
+            cmap_veg.N
+        ) 
+
+        # Set up the plot with PlateCarree (WGS84)
         mpl.rcParams['text.usetex'] = True
         mpl.rcParams['axes.linewidth'] = 1
         mpl.rcParams['axes.labelsize'] = 12.
-        mpl.rcParams['legend.fontsize'] = 'small'
+        mpl.rcParams['legend.fontsize'] = 20.
         mpl.rcParams['legend.fancybox'] = True
         mpl.rcParams['font.size'] = 12.
         mpl.rcParams['xtick.labelsize'] = 12.
         mpl.rcParams['ytick.labelsize'] = 12.
-        mpl.rcParams['figure.subplot.left'] = .05
+        mpl.rcParams['figure.subplot.left'] = .15
         mpl.rcParams['figure.subplot.right'] = .95
-        mpl.rcParams['figure.subplot.top'] = .9
-        mpl.rcParams['figure.subplot.bottom'] = .0
+        mpl.rcParams['figure.subplot.top'] = .99
+        mpl.rcParams['figure.subplot.bottom'] = .17
         mpl.rcParams['figure.subplot.hspace'] = 0.05
         mpl.rcParams['figure.subplot.wspace'] = 0.05  
-        fig  = plt.figure(figsize=(6,4.2))
-        ax_loc = fig.add_subplot(111, projection=ccrs.PlateCarree())
-        ax_loc.scatter(lon,lat, s=30, color='r')
+        fig, ax = plt.subplots(figsize=(8, 8),
+                               subplot_kw={'projection': ccrs.PlateCarree()})
+
+        # Plot the vegetation map
+        img = ax.imshow(
+            vegetation_crop,
+            origin='upper',
+            extent=[lon_min, lon_max, lat_min, lat_max],
+            transform=ccrs.PlateCarree(),
+            interpolation='nearest',
+            cmap=cmap_veg,
+            norm=norm_veg,
+            zorder=0
+        )
+
+        #fire loc
+        ax.scatter(lon,lat, s=70, facecolor='none', edgecolor='k', zorder=1, transform=ccrs.PlateCarree(), linewidth=2  )
+
+        # Add map features
+        ax.add_feature(cfeature.BORDERS, linestyle=':')
+        ax.add_feature(cfeature.COASTLINE)
+        #ax.add_feature(cfeature.LAND, edgecolor='black', alpha=0.2)
+        #ax.add_feature(cfeature.OCEAN)
+        #ax.add_feature(cfeature.LAKES, alpha=0.4)
+        #ax.add_feature(cfeature.RIVERS)
+
+        ax.set_title("Corine Land Cover", fontsize=20)
+        cbar = plt.colorbar(img, ax=ax, orientation='horizontal',pad=.02)
+        
+        tick_locs = values_colorbar[:-1]+0.5*np.diff(values_colorbar) #legend_filtered.index.values + 0.5  # Center of bins
+        
+        cbar.set_ticks(tick_locs)
+        # Set the tick labels using the 'label' column
+        cbar.set_ticklabels(legend_filtered['label'].values, fontsize=20)
+        # Optional: set label/title
+
+        # Rotate tick labels by 45 degrees
+        for label in cbar.ax.get_xticklabels():
+            label.set_rotation(45)
+            label.set_ha('right')  # Optional: improves alignment
+    
+        add_scalebar(ax, 2, location=(0.1, 0.05), linewidth=3, text_offset=0.01)
+
+        # === sub fig cart location fire ===
+        ax_loc = fig.add_axes([0.02, 0.72, 0.3, 0.3], projection=ccrs.PlateCarree())
+        ax_loc.scatter(lon,lat, s=20, color='r',zorder=4)
         # Base map
-        ax_loc.add_feature(cfeature.COASTLINE)
-        ax_loc.add_feature(cfeature.BORDERS, linestyle=':')
-        ax_loc.add_feature(cfeature.LAND, facecolor='lightgray')
-        ax_loc.add_feature(cfeature.OCEAN, facecolor='lightblue')
+        ax_loc.add_feature(cfeature.COASTLINE,zorder=3)
+        ax_loc.add_feature(cfeature.BORDERS, linestyle=':',zorder=2)
+        ax_loc.add_feature(cfeature.LAND, facecolor='lightgray',zorder=0)
+        ax_loc.add_feature(cfeature.OCEAN, facecolor='lightblue',zorder=1)
         ax_loc.set_extent([-6, 10.5, 41, 51.5], crs=ccrs.PlateCarree())
         lat_dms = decimal_to_dms(lat)
         lon_dms = decimal_to_dms(lon)
-        ax_loc.set_title(f"lon: {lon_dms[0]}°{lon_dms[1]}'{lon_dms[2]}\"\n"+f"lat: {lat_dms[0]}°{lat_dms[1]}'{lat_dms[2]}\"" , fontsize=21) 
-      
-        fig.savefig(f"{params['general']['reportDir']}/{XX_FIRE_LOC_MAP}")
+        #XX_FIRE_LOC = "lon: {lon_dms[0]}°{lon_dms[1]}'{lon_dms[2]}\"\n"+f"lat: {lat_dms[0]}°{lat_dms[1]}'{lat_dms[2]}\""
+        #ax_loc.set_title(f"lon: {lon_dms[0]}°{lon_dms[1]}'{lon_dms[2]}\"\n"+f"lat: {lat_dms[0]}°{lat_dms[1]}'{lat_dms[2]}\"" , fontsize=21) 
+         
+        fig.savefig(f"{params['general']['reportDir']}/{XX_FIRE_VEG_MAP}")
         plt.close(fig)
 
         #local pof image
@@ -426,6 +556,9 @@ if __name__ == '__main__':
         pof_j2 = ds_pof.sel(time=time_report+pd.Timedelta(days=2),method='nearest')['MODEL_FIRE']
         plot_pof(params,pof_j2, f'pof_{row["id_fire_event"]}_j2.png',extent=bounding_box_km(lon, lat),fireloc=(lon,lat),flag_colorbar=True)
         XX_FIRE_ID=f"{row['id_fire_event']}"
+        
+        # === 1. Metadata ===
+        XX_METADATA = f"Last obs - time: {time.strftime('%Y%m%dT%H:%MZ')} \quad FRP: {frp:5.2f} MW \quad Area: {area:5.2f} km$^{2}$ \quad lon: {lon_dms[0]}°{lon_dms[1]}'{lon_dms[2]} \quad lat: {lat_dms[0]}°{lat_dms[1]}'{lat_dms[2]}\""
 
         #dummy rgb and ir38
         shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h0.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h0.png")
@@ -437,7 +570,7 @@ if __name__ == '__main__':
 
 
         #add content to line for text file
-        linesFires.append(firePage(params,XX_FIRE_NAME, XX_FIRE_LOC_MAP, XX_FIRE_FRP,XX_METADATA,XX_FIRE_ID,XX_FFMNH_URL))
+        linesFires.append(firePage(params,XX_FIRE_NAME, XX_FIRE_VEG_MAP, XX_FIRE_FRP,XX_METADATA,XX_FIRE_ID,XX_FFMNH_URL))
 
 
     generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE, XX_TIME_REPORT, linesFires)
@@ -446,4 +579,4 @@ if __name__ == '__main__':
     shutil.copy(f"{params['general']['reportDir']}/fireReport.pdf", f"{dir_report}/{time_report.strftime('%Y%m%d')}/fires_FR_{time_last_geojson}.pdf")
     print(f"✅ PDF created: {dir_report}/fires_FR_{time_last_geojson}.pdf")
     
-    shutil.rmtree(params['general']['reportDir'])
+    #shutil.rmtree(params['general']['reportDir'])

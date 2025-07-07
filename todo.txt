@@ -1,0 +1,8 @@
+get the cloud mask to stop fire a bit better
+##connect to discord to send info on new fire
+##get a dic to associate fire id to something used by jonathan 
+##time serie of FRP in quicklook. check with francois how to name the png. 
+
+include vegetation map on the report
+download nc from ffmnh
+increase size of legend in FRP time series, add clound mask, (hourly FWI?)
