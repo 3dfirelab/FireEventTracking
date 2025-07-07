@@ -504,7 +504,7 @@ if __name__ == '__main__':
         )
 
         #fire loc
-        ax.scatter(lon,lat, s=70, facecolor='none', edgecolor='k', zorder=1, transform=ccrs.PlateCarree(), linewidth=2  )
+        ax.scatter(lon,lat, s=100, facecolor='none', edgecolor='k', zorder=1, transform=ccrs.PlateCarree(), linewidth=2  )
 
         # Add map features
         ax.add_feature(cfeature.BORDERS, linestyle=':')
