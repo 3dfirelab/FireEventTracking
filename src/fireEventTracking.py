@@ -1005,12 +1005,26 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 copy_tasks.append((tmp_filePkl, dest_filePkl))
                 if dir_Pkl == None: dir_Pkl = os.path.dirname(dest_filePkl)
                 # Create and save the FRP time series plot in temporary dir
+                mpl.rcdefaults()
+                mpl.rcParams['axes.labelsize'] = 20.
+                mpl.rcParams['legend.fontsize'] = 'small'
+                mpl.rcParams['legend.fancybox'] = True
+                mpl.rcParams['font.size'] = 20.
+                mpl.rcParams['xtick.labelsize'] = 20.
+                mpl.rcParams['ytick.labelsize'] = 20.
+                mpl.rcParams['figure.subplot.left'] = .05
+                mpl.rcParams['figure.subplot.right'] = .95
+                mpl.rcParams['figure.subplot.top'] = .91
+                mpl.rcParams['figure.subplot.bottom'] = .05
+                mpl.rcParams['figure.subplot.hspace'] = 0.05
+                mpl.rcParams['figure.subplot.wspace'] = 0.05  
+
                 fig = plt.figure(figsize=(10, 5))
                 ax = plt.subplot(111)
                 ax.plot(event.times, event.frps, marker='o', linestyle='-')
                 ax.set_xlabel('time')
                 ax.set_ylabel('FRP (MW)')
-
+                ax.set_title(' '.join(event.name.split('_')[2:4]))
                 # File paths
                 tmp_file = os.path.join(tmp_dir, f"{event.id_fire_event:09d}.png")
                 dest_file = os.path.join(params['event']['dir_frp'], f"{event.id_fire_event:09d}.png")

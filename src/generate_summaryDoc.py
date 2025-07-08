@@ -1,6 +1,6 @@
 import numpy as np 
 import matplotlib as mpl
-mpl.use('TkAgg')  # or 'QtAgg'
+mpl.use('Agg')  # or 'QtAgg'
 import matplotlib.pyplot as plt
 import geopandas as gpd
 import requests
@@ -186,7 +186,7 @@ def bounding_box_km(lon, lat, half_side_km=20):
 
 
 ################################
-def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0), flag_colorbar=False):
+def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0), flag_colorbar=False, flag_scalebar=False):
 
     jid = int(filename.split('.')[0][-1])
 
@@ -216,6 +216,10 @@ def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0
     ax_map.pcolormesh(pof_now.lon, pof_now.lat, pof_now, cmap=cmap, norm=norm)
     ax_map.scatter(fireloc[0],fireloc[1], facecolor='none',edgecolor='k',s=100, linewidth=2  )
     ax_map.set_title(f'POF date={pof_now.time.values} (j+{jid})',fontsize=20)
+
+    if flag_scalebar:
+        add_scalebar(ax_map, 2, location=(0.1, 0.05), linewidth=3, text_offset=0.01)
+
     fig.savefig(f"{params['general']['reportDir']}/{filename}")
     plt.close(fig)
 
@@ -271,7 +275,7 @@ def add_scalebar(ax, length_km, location=(0.1, 0.05), linewidth=3, text_offset=0
 ############################
 if __name__ == '__main__':
 ############################ 
-    inputName ='SILEX'
+    inputName ='SILEX-MF'
     sensorName = 'FCI'
     log_dir = os.path.dirname(os.path.abspath(__file__)) +'/../log_doc/'
 
@@ -318,7 +322,7 @@ if __name__ == '__main__':
     norm = BoundaryNorm(levels, ncolors=cmap.N)
 
     # CLC colorcode
-    legend_path = "/home/paugam/AERIS_2/CorineLandCover/u2018_clc2018_v2020_20u1_raster100m/Legend/CLC2018_CLC2018_V2018_20_QGIS.txt"
+    legend_path = f"{params['general']['root_data']}/CorineLandCover/u2018_clc2018_v2020_20u1_raster100m/Legend/CLC2018_CLC2018_V2018_20_QGIS.txt"
     legend_df = pd.read_csv(
         legend_path,
         header=None,
@@ -550,7 +554,7 @@ if __name__ == '__main__':
 
         #local pof image
         pof_j0 = ds_pof.sel(time=time_report+pd.Timedelta(days=0),method='nearest')['MODEL_FIRE']
-        plot_pof(params,pof_j0, f'pof_{row["id_fire_event"]}_j0.png',extent=bounding_box_km(lon, lat),fireloc=(lon,lat)) 
+        plot_pof(params,pof_j0, f'pof_{row["id_fire_event"]}_j0.png',extent=bounding_box_km(lon, lat),fireloc=(lon,lat),flag_scalebar=True) 
         pof_j1 = ds_pof.sel(time=time_report+pd.Timedelta(days=1),method='nearest')['MODEL_FIRE']
         plot_pof(params,pof_j1, f'pof_{row["id_fire_event"]}_j1.png',extent=bounding_box_km(lon, lat),fireloc=(lon,lat))
         pof_j2 = ds_pof.sel(time=time_report+pd.Timedelta(days=2),method='nearest')['MODEL_FIRE']
