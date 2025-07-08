@@ -16,7 +16,7 @@ for logger_name in ['discord', 'discord.client', 'discord.gateway', 'discord.htt
     logger.propagate = False
     logger.handlers.clear()
 
-TOKEN = os.environ['discord_token_fire_alert']
+#TOKEN = os.environ['discord_token_fire_alert']
 
 def send_message_to_discord(message, CHANNEL_ID):
 

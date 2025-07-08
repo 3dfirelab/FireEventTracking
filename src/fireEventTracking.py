@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import os 
 import matplotlib as mpl
-mpl.use('Agg')
+#mpl.use('Agg')
 import matplotlib.pyplot as plt 
 import sys
 from pathlib import Path
@@ -37,6 +37,7 @@ from multiprocessing import Pool
 import polyline 
 import requests 
 import json 
+import socket
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -317,6 +318,9 @@ def cache_file(params, fireEvents_files, max_workers=16):
 
 ####################################################
 def post_on_discord_and_runffMNH(params,event):
+    
+    if socket.gethostname() == 'pc70852': return None
+    
     if 'fire_FR' not in event.fire_name:
         event.add_ffmnhSimu('none')
         return None
@@ -351,7 +355,8 @@ def post_on_discord_and_runffMNH(params,event):
 
 ####################################################
 def run_ffMNH_corte(params, event, lon, lat):
-    
+   
+    if socket.gethostname() == 'pc70852': return None
     url = "https://forefire.univ-corse.fr/simapi/forefireAPI.php"
 
     data = {
@@ -619,7 +624,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         #load last obs
         hsgdf = hstools.load_hs4lastObsAllSat(day,hour,params)
         if len(hsgdf)==0: 
-            print('skip [no hs]  ', end='')
+            print('skip [no hs]  ', end='\n')
             date_now = date_now + timedelta(minutes=dt_minutes_perimeters)    
             idate+=1
             continue
