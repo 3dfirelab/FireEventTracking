@@ -2,7 +2,7 @@
 general:
   domain: -10,35,20,52
   domainName: 'SILEX'
-  crs: 25829
+  crs: 3035
   use_sedoo_drive: False 
   root_data: /home/paugam/AERIS_2/
 hs:
@@ -12,8 +12,9 @@ event:
   dir_data: ORIGIN/fire_events 
   dir_geoJson: ORIGIN/fire_events/GeoJson
   dir_frp: ORIGIN/fire_events/FRP
-  start_time: '2025-06-17_1400'
+  start_time: '2025-06-29_0000'
   mask_HS: mask_hs_600m_europe.nc
+  eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
 postproc:
   dir_FWI:  AROME/FWI
   dir_WIND: AROME/FORECAST/WIND/
