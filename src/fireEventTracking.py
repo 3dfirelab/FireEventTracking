@@ -723,7 +723,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             hsgdf_all = hsgdf_all.drop(columns=['original_index'])
         #hsgdf_all = hsgdf_all.reset_index().rename(columns={'index': 'original_index'})  # If your index isn't already a column
         hsgdf_all['original_index'] = hsgdf_all.index
-
+        
         # Aggregate hotspots by fire event
         fireCluster = hsgdf_all.groupby('cluster_fire_event').agg(
             total_hotspots=('latitude', 'count'),
@@ -738,8 +738,8 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         #compute FRP per cluster using only the last hotspot
         frp_cluster = []
         for icluster, cluster in fireCluster.iterrows():
-            idx_valid_hs = hsgdf_all.iloc[fireCluster['indices_hs'][icluster]]['timestamp'] >= np.datetime64(date_now.replace(tzinfo=None))
-            frp_ = hsgdf_all.iloc[fireCluster['indices_hs'][icluster]].frp[idx_valid_hs].sum()
+            idx_valid_hs = hsgdf_all.loc[fireCluster['indices_hs'][icluster]]['timestamp'] >= np.datetime64(date_now.replace(tzinfo=None))
+            frp_ = hsgdf_all.loc[fireCluster['indices_hs'][icluster]].frp[idx_valid_hs].sum()
             frp_cluster.append(frp_)
         fireCluster['frp'] = frp_cluster
 
