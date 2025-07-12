@@ -370,9 +370,9 @@ def run_ffMNH_corte(params, event, lon, lat):
         'apikey': 'DEMO',
         'message': 'QUICK800'
     }
-    print(f'ronanSilex{event.id_fire_event}')
-    print(polyline.encode([(lat,lon)]))
-    print(event.times[-1].strftime('%Y-%m-%dT%H:%M:%SZ'))
+    #print(f'ronanSilex{event.id_fire_event}')
+    #print(polyline.encode([(lat,lon)]))
+    #print(event.times[-1].strftime('%Y-%m-%dT%H:%M:%SZ'))
 
     response = requests.post(url, data=data, verify=False)
 
@@ -1017,10 +1017,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 mpl.rcParams['font.size'] = 20.
                 mpl.rcParams['xtick.labelsize'] = 20.
                 mpl.rcParams['ytick.labelsize'] = 20.
-                mpl.rcParams['figure.subplot.left'] = .05
+                mpl.rcParams['figure.subplot.left'] = .07
                 mpl.rcParams['figure.subplot.right'] = .95
                 mpl.rcParams['figure.subplot.top'] = .91
-                mpl.rcParams['figure.subplot.bottom'] = .05
+                mpl.rcParams['figure.subplot.bottom'] = .07
                 mpl.rcParams['figure.subplot.hspace'] = 0.05
                 mpl.rcParams['figure.subplot.wspace'] = 0.05  
 
@@ -1029,7 +1029,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 ax.plot(event.times, event.frps, marker='o', linestyle='-')
                 ax.set_xlabel('time')
                 ax.set_ylabel('FRP (MW)')
-                ax.set_title(' '.join(event.name.split('_')[2:4]))
+                ax.set_title(' '.join(event.fire_name.split('_')[2:4]))
                 # File paths
                 tmp_file = os.path.join(tmp_dir, f"{event.id_fire_event:09d}.png")
                 dest_file = os.path.join(params['event']['dir_frp'], f"{event.id_fire_event:09d}.png")
@@ -1235,13 +1235,15 @@ def run_fire_tracking(args):
         if params['general']['sensor'] == 'VIIRS':
             end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
         elif params['general']['sensor'] == 'FCI':
-            end = (datetime.now(timezone.utc) - timedelta(minutes=20))
+            end = (datetime.now(timezone.utc) - timedelta(minutes=20)) #20 minute of MTG latence.
             # Round down to the nearest xx:00 or xx:30
             end = end.replace(second=0, microsecond=0)
             if end.minute < 30:
                 end = end.replace(minute=0)
             else:
                 end = end.replace(minute=30) 
+        
+        end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
     else:
         print('missing inputName')
         sys.exit()

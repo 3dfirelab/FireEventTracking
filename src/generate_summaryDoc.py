@@ -103,10 +103,13 @@ def decimal_to_dms(decimal_degree):
 
 
 ######################################################
-def generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE,XX_TIME_REPORT,firePages):
+def generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE,time_report,firePages):
 
     with open(params['general']['srcDir']+'/fireReport/template.tex', 'rb') as f:
         lines = f.readlines()
+
+    XX_TIME_REPORT_beg = time_report.strftime('%Y%m%dT %HH:%MMZ')
+    XX_TIME_REPORT_end = (time_report+pd.Timedelta(minutes=30)).strftime('%Y%m%dT %HH:%MMZ')
 
     for ii, line in enumerate(lines):
         decoded_line = line.decode('utf-8')
@@ -116,8 +119,11 @@ def generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE,XX_TIME_REPORT,fireP
         if 'XX_NUMBER_OF_FIRE' in decoded_line:
             decoded_line = decoded_line.replace('XX_NUMBER_OF_FIRE', XX_NUMBER_OF_FIRE)
             lines[ii] = decoded_line.encode('utf-8')
-        if 'XX_TIME_REPORT' in decoded_line:
-            decoded_line = decoded_line.replace('XX_TIME_REPORT', XX_TIME_REPORT)
+        if 'XX_TIME_REPORT_beg' in decoded_line:
+            decoded_line = decoded_line.replace('XX_TIME_REPORT_beg', XX_TIME_REPORT_beg)
+            lines[ii] = decoded_line.encode('utf-8')  # store back as bytes
+        if 'XX_TIME_REPORT_end' in decoded_line:
+            decoded_line = decoded_line.replace('XX_TIME_REPORT_end', XX_TIME_REPORT_end)
             lines[ii] = decoded_line.encode('utf-8')  # store back as bytes
 
     with open(f"{params['general']['reportDir']}/fireReport.tex", 'wb') as f:
@@ -577,7 +583,7 @@ if __name__ == '__main__':
         linesFires.append(firePage(params,XX_FIRE_NAME, XX_FIRE_VEG_MAP, XX_FIRE_FRP,XX_METADATA,XX_FIRE_ID,XX_FFMNH_URL))
 
 
-    generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE, XX_TIME_REPORT, linesFires)
+    generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE, time_report, linesFires)
 
     os.makedirs(f"{dir_report}/{time_report.strftime('%Y%m%d')}",exist_ok=True)
     shutil.copy(f"{params['general']['reportDir']}/fireReport.pdf", f"{dir_report}/{time_report.strftime('%Y%m%d')}/fires_FR_{time_last_geojson}.pdf")
