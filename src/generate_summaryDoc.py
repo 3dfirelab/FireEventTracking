@@ -1,6 +1,6 @@
 import numpy as np 
 import matplotlib as mpl
-mpl.use('Agg')  # or 'QtAgg'
+#mpl.use('Agg')  # or 'QtAgg'
 import matplotlib.pyplot as plt
 import geopandas as gpd
 import requests
@@ -33,6 +33,7 @@ from rasterio.windows import from_bounds
 from rasterio.enums import Resampling
 from rasterio.warp import transform_bounds
 import pandas as pd
+from matplotlib.patches import Rectangle
 
 
 import urllib3
@@ -205,10 +206,10 @@ def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0
     mpl.rcParams['font.size'] = 12.
     mpl.rcParams['xtick.labelsize'] = 12.
     mpl.rcParams['ytick.labelsize'] = 12.
-    mpl.rcParams['figure.subplot.left'] = .05
-    mpl.rcParams['figure.subplot.right'] = .95
+    mpl.rcParams['figure.subplot.left'] = .01
+    mpl.rcParams['figure.subplot.right'] = .99
     mpl.rcParams['figure.subplot.top'] = .95
-    mpl.rcParams['figure.subplot.bottom'] = .05
+    mpl.rcParams['figure.subplot.bottom'] = .01
     mpl.rcParams['figure.subplot.hspace'] = 0.05
     mpl.rcParams['figure.subplot.wspace'] = 0.05  
     fig = plt.figure(figsize=(8,6))
@@ -221,18 +222,26 @@ def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0
 
     ax_map.pcolormesh(pof_now.lon, pof_now.lat, pof_now, cmap=cmap, norm=norm)
     ax_map.scatter(fireloc[0],fireloc[1], facecolor='none',edgecolor='k',s=100, linewidth=2  )
-    ax_map.set_title(f'POF date={pof_now.time.values} (j+{jid})',fontsize=20)
+    ax_map.set_title(f"POF date={pd.Timestamp(pof_now.time.values).strftime('%Y%m%d %H%M')} (j+{jid})",fontsize=20)
+
+    bbox_ = ax_map.get_position()  # returns a Bbox object
+
+    left  = bbox_.x0
+    right  = bbox_.x1
+    bottom =  bbox_.y0
+    top    =  bbox_.y1
+
 
     if flag_scalebar:
-        add_scalebar(ax_map, 2, location=(0.1, 0.05), linewidth=3, text_offset=0.01)
+        add_scalebar(ax_map, 5, location=(0.1, 0.05), linewidth=3, text_offset=0.01)
 
     fig.savefig(f"{params['general']['reportDir']}/{filename}")
     plt.close(fig)
 
     if flag_colorbar:
         # Create a separate figure for colorbar
-        fig_cb = plt.figure(figsize=(1.2, 6))  # adjust size as needed
-        ax_cb = fig_cb.add_axes([0.0, 0.1, 0.2, 0.73])  # [left, bottom, width, height]
+        fig_cb = plt.figure(figsize=(1., 6))  # adjust size as needed
+        ax_cb = fig_cb.add_axes([0.0, bottom, 0.2, top-bottom])  # [left, bottom, width, height]
 
         # Create a dummy mappable with your colormap and norm
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -243,7 +252,7 @@ def plot_pof(params,pof_now, filename, extent=[-6, 10.5, 41, 51.5], fireloc=(0,0
         cbar.set_label('POF', fontsize=12)  # label as needed
         cbar.ax.tick_params(labelsize=10)
 
-        fig_cb.savefig(f"{params['general']['reportDir']}/{filename.split('.')[0]}_colorbar.png", dpi=100, bbox_inches='tight')
+        fig_cb.savefig(f"{params['general']['reportDir']}/{filename.split('.')[0]}_colorbar.png", dpi=100)
         plt.close(fig_cb)
 
 
@@ -278,6 +287,248 @@ def add_scalebar(ax, length_km, location=(0.1, 0.05), linewidth=3, text_offset=0
     ax.text((lon_start + lon_end) / 2, lat_start + text_offset * (lat_max - lat_min),
             f'{length_km} km', transform=ccrs.PlateCarree(),
             ha='center', va='bottom', fontsize=20)
+
+###############
+def plot_rgb(params, time_fire, lon, lat,hourFire, XX_FIRE_ID, bminbamx=None ):
+        
+    minute = time_fire.minute
+    rounded_minute = (minute // 10) * 10
+    last_valid_time_fire = time_fire.replace(minute=rounded_minute, second=0, microsecond=0)
+
+    #Tiff RGB
+    #####
+    time_rgb0 = last_valid_time_fire  
+    dir_rgb_ = f"{params['general']['root_data']}/FCI/RASTER/tiff/{time_rgb0.strftime('%Y%m%d')}/"
+    file_latest_rgb0 = f"{dir_rgb_}/fci-rgb-SILEXdomain-{time_rgb0.strftime('%Y%j')}.{time_rgb0.strftime('%H%M')}.tiff"
+ 
+    if not(os.path.isfile(file_latest_rgb0)):
+        shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h{hourFire}.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h{hourFire}.png")
+        return 'missing image', None
+
+    with rasterio.open(file_latest_rgb0) as src:
+        # Reproject bounding box to raster CRS
+        lon_min, lon_max, lat_min, lat_max = bounding_box_km(lon, lat, half_side_km=50)
+        bbox_wgs84 = (lon_min, lat_min, lon_max, lat_max)
+        bbox_proj = transform_bounds("EPSG:4326", src.crs, *bbox_wgs84)
+        
+        # Compute window in raster coordinates
+        window = from_bounds(*bbox_proj, transform=src.transform)
+        
+        # Read data within window
+        rgb_crop = src.read((1,2,3), window=window, resampling=Resampling.nearest)
+        
+        # Get updated transform for cropped array
+        transform_crop = src.window_transform(window)
+    
+    # Set up the plot with PlateCarree (WGS84)
+    mpl.rcParams['text.usetex'] = True
+    mpl.rcParams['axes.linewidth'] = 1
+    mpl.rcParams['axes.labelsize'] = 12.
+    mpl.rcParams['legend.fontsize'] = 20.
+    mpl.rcParams['legend.fancybox'] = True
+    mpl.rcParams['font.size'] = 12.
+    mpl.rcParams['xtick.labelsize'] = 12.
+    mpl.rcParams['ytick.labelsize'] = 12.
+    mpl.rcParams['figure.subplot.left'] = .01
+    mpl.rcParams['figure.subplot.right'] = .99
+    mpl.rcParams['figure.subplot.top'] = .95
+    mpl.rcParams['figure.subplot.bottom'] = .01
+    mpl.rcParams['figure.subplot.hspace'] = 0.05
+    mpl.rcParams['figure.subplot.wspace'] = 0.05  
+    fig, ax = plt.subplots(figsize=(8, 6),
+                           subplot_kw={'projection': ccrs.PlateCarree()})
+
+    
+    # Transpose to (H, W, 3)
+    rgb = np.moveaxis(rgb_crop, 0, -1)
+    # Normalize each band by its own min/max (simple linear normalization)
+    rgb_norm = np.zeros_like(rgb)
+    flag_getbminbmax = False
+    if bminbamx == None:
+        flag_getbminbmax = True
+        bminbamx = []
+    for i in range(3):
+        if flag_getbminbmax:
+            bmin, bmax = rgb[..., i].min(), rgb[..., i].max()
+            bminbamx.append([bmin, bmax])
+        else:
+            bmin, bmax = bminbamx[i]
+
+        if bmax > bmin:
+            rgb_norm[..., i] = (rgb[..., i] - bmin) / (bmax - bmin)
+    rgb_norm = np.clip(rgb_norm, 0, 1)
+
+    # Plot the vegetation map
+    ax.imshow(
+        rgb_norm,
+        origin='upper',
+        extent=[lon_min, lon_max, lat_min, lat_max],
+        transform=ccrs.PlateCarree(),
+        interpolation='nearest',
+        zorder=0
+    )
+
+    # Add map features
+    ax.add_feature(cfeature.BORDERS, linestyle=':')
+    ax.add_feature(cfeature.COASTLINE)
+    
+    if hourFire == 0: 
+        comment_ = 'last obs'
+    elif hourFire == 1: 
+        comment_ = '(-30 min)'
+    elif hourFire == 2: 
+        comment_ = '(-1h)'
+    ax.set_title(f"RGB - {time_rgb0.strftime('%Y%m%d %H%M')} - {comment_}", fontsize=25)
+
+    if hourFire == 0: 
+        add_scalebar(ax, 5, location=(0.1, 0.05), linewidth=3, text_offset=0.01)
+   
+    #add the SC box
+    # Compute 20 km x 20 km bounding box around (lon, lat)
+    lon_min_boxSC, lon_max_boxSC, lat_min_boxSC, lat_max_boxSC = bounding_box_km(lon, lat, half_side_km=10)
+
+    # Compute width and height in degrees
+    width_deg = lon_max_boxSC - lon_min_boxSC
+    height_deg = lat_max_boxSC - lat_min_boxSC
+
+    # Add rectangle to the plot
+    rect = Rectangle(
+        (lon_min_boxSC, lat_min_boxSC),  # lower-left corner
+        width_deg,
+        height_deg,
+        linewidth=1.5,
+        linestyle=':',
+        edgecolor='black',
+        facecolor='none',
+        transform=ccrs.PlateCarree(),
+        zorder=2
+    )
+    ax.add_patch(rect)
+
+    XX_FIRE_RGB_MAP0 = f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h{hourFire}.png"
+    fig.savefig(XX_FIRE_RGB_MAP0)
+    plt.close(fig)
+
+    return XX_FIRE_RGB_MAP0, bminbamx
+
+###############
+def plot_ir(params, time_fire, lon, lat, hourFire, XX_FIRE_ID, irRange, flag_colorbar=False ):
+        
+    minute = time_fire.minute
+    rounded_minute = (minute // 10) * 10
+    last_valid_time_fire = time_fire.replace(minute=rounded_minute, second=0, microsecond=0)
+
+    #NC 
+    #####
+    time_ir0 = last_valid_time_fire  
+    dir_ir_ = f"{params['general']['root_data']}/FCI/RASTER/nc/{time_ir0.strftime('%Y%m%d')}/"
+    file_latest_ir0 = f"{dir_ir_}/fci-ir-SILEXdomain-{time_ir0.strftime('%Y%j')}.{time_ir0.strftime('%H%M')}.nc"
+ 
+    if not(os.path.isfile(file_latest_ir0)):
+        shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h{hourFire}.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h{hourFire}.png")
+        if flag_colorbar:
+            shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h{hourFire}_colorbar.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h{hourFire}_colorbar.png")
+
+        return 'missing image', None
+
+    ds = xr.open_dataset(file_latest_ir0)
+    
+    # Set up the plot with PlateCarree (WGS84)
+    mpl.rcParams['text.usetex'] = True
+    mpl.rcParams['axes.linewidth'] = 1
+    mpl.rcParams['axes.labelsize'] = 12.
+    mpl.rcParams['legend.fontsize'] = 20.
+    mpl.rcParams['legend.fancybox'] = True
+    mpl.rcParams['font.size'] = 12.
+    mpl.rcParams['xtick.labelsize'] = 12.
+    mpl.rcParams['ytick.labelsize'] = 12.
+    mpl.rcParams['figure.subplot.left'] = .01
+    mpl.rcParams['figure.subplot.right'] = .99
+    mpl.rcParams['figure.subplot.top'] = .95
+    mpl.rcParams['figure.subplot.bottom'] = .01
+    mpl.rcParams['figure.subplot.hspace'] = 0.05
+    mpl.rcParams['figure.subplot.wspace'] = 0.05  
+    fig, ax = plt.subplots(figsize=(8, 6),
+                           subplot_kw={'projection': ccrs.PlateCarree()})
+
+    
+    # crop ir38
+    lon_min, lon_max, lat_min, lat_max = bounding_box_km(lon, lat, half_side_km=50)
+    ir = ds['ir_38'].isel(time=0)
+    ir = ir.sel(lat=slice(lat_max, lat_min),lon=slice(lon_min, lon_max))
+
+    if flag_colorbar:
+        irmin = ir.min()
+        irmax = ir.max()
+    else:
+        irmin = irRange[0]-10
+        irmax = irRange[1]+10
+
+    # Plot the vegetation map
+    im = ax.imshow(
+        ir,
+        origin='upper',
+        extent=[lon_min, lon_max, lat_min, lat_max],
+        transform=ccrs.PlateCarree(),
+        interpolation='nearest',
+        zorder=0,
+        cmap='inferno',
+        vmin=irmin,
+        vmax=irmax
+    )
+    bbox_ = ax.get_position()  # returns a Bbox object
+
+    left  = bbox_.x0
+    right  = bbox_.x1
+    bottom =  bbox_.y0
+    top    =  bbox_.y1
+   
+    # Add map features
+    ax.add_feature(cfeature.BORDERS, linestyle=':')
+    ax.add_feature(cfeature.COASTLINE)
+    
+    if hourFire == 0: 
+        comment_ = 'last obs'
+    elif hourFire == 1: 
+        comment_ = '(-30 min)'
+    elif hourFire == 2: 
+        comment_ = '(-1h)'
+    ax.set_title(f"IR 3.8 - {time_ir0.strftime('%Y%m%d %H%M')} - {comment_}", fontsize=25)
+
+    if hourFire == 0: 
+        add_scalebar(ax, 5, location=(0.1, 0.05), linewidth=3, text_offset=0.01)
+   
+
+    XX_FIRE_IR_MAP0 = f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h{hourFire}.png"
+    fig.savefig(XX_FIRE_IR_MAP0)
+    plt.close(fig)
+
+    if flag_colorbar:
+
+        # Create a separate figure for the colorbar
+        fig_cb = plt.figure(figsize=(1, 6))
+        ax_cb = fig_cb.add_axes([0.0, bottom, 0.2, top-bottom])  # [left, bottom, width, height]
+
+        # Create ScalarMappable using the same colormap and norm from the image
+        sm = plt.cm.ScalarMappable(cmap=im.get_cmap(), norm=im.norm)
+        sm.set_array([])  # required dummy array
+
+        # Draw the colorbar
+        cbar = fig_cb.colorbar(sm, cax=ax_cb, orientation='vertical')
+        cbar.set_label('BT IR 3.8 (K)', fontsize=12)
+        cbar.ax.tick_params(labelsize=10)
+
+        # Save the colorbar figure
+        fig_cb.savefig(XX_FIRE_IR_MAP0.replace('.png','_colorbar.png'),
+                       dpi=100)
+        plt.close(fig_cb)
+
+
+    return XX_FIRE_IR_MAP0, [irmin,irmax]
+
+
+
+
 ############################
 if __name__ == '__main__':
 ############################ 
@@ -314,7 +565,8 @@ if __name__ == '__main__':
     #POF
     #####
     dir_pof = f"{params['general']['root_data']}/POF"
-    XX_TIME_REPORT = time_report.strftime('%Y%m%dT %HH:%MMZ')
+    XX_TIME_REPORT_beg = time_report.strftime('%Y%m%dT %HH:%MMZ')
+    XX_TIME_REPORT_end = (time_report+pd.Timedelta(minutes=30)).strftime('%Y%m%dT %HH:%MMZ')
     file_latest_pof = f"{dir_pof}/POF_1KM_MF_{(time_report-pd.Timedelta(days=1)).strftime('%Y%m%d')}_FC.nc"
     ds_pof = xr.open_dataset(file_latest_pof)
     # Your color list
@@ -341,17 +593,20 @@ if __name__ == '__main__':
     )
     legend_df['code'] = legend_df['code'].astype(int)
 
+
     # Sort by FRP descending and keep top 10
+    ###########
     top_fires = gdf_france.sort_values("frp", ascending=False).head(10)
     transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
 
+
     # Create PDF
-    
+    ###########    
     XX_TABLE_HERE = ''
     for _, row in top_fires.iterrows():
         XX_TABLE_HERE +=\
             f"\hyperref[sec:fireID{row['id_fire_event']}]"+"{" + ' '.join(row["name"].split('_')[2:4]) + '}' + '&' +\
-            row["time"].strftime('%Y-%m-%d %H:%S')+ '&' +\
+            row["time"].strftime('%Y-%m-%d %H:%M')+ '&' +\
             f"{row['frp']:.2f}"+ '&' +\
             f"{row['area_km2']:.2f}" + '\\\\'
         XX_TABLE_HERE += '\n'
@@ -383,10 +638,10 @@ if __name__ == '__main__':
     mpl.rcParams['font.size'] = 12.
     mpl.rcParams['xtick.labelsize'] = 12.
     mpl.rcParams['ytick.labelsize'] = 12.
-    mpl.rcParams['figure.subplot.left'] = .05
-    mpl.rcParams['figure.subplot.right'] = .95
+    mpl.rcParams['figure.subplot.left'] = .01
+    mpl.rcParams['figure.subplot.right'] = .99
     mpl.rcParams['figure.subplot.top'] = .95
-    mpl.rcParams['figure.subplot.bottom'] = .05
+    mpl.rcParams['figure.subplot.bottom'] = .01
     mpl.rcParams['figure.subplot.hspace'] = 0.05
     mpl.rcParams['figure.subplot.wspace'] = 0.05  
     fig = plt.figure(figsize=(8,6))
@@ -398,7 +653,7 @@ if __name__ == '__main__':
     ax_map.add_feature(cfeature.BORDERS, linestyle=':')
     ax_map.scatter(loc_fire_all[:,0], loc_fire_all[:,1], color='blue', s=30, label='other active' )
     ax_map.scatter(loc_fire_top[:,0], loc_fire_top[:,1], color='red', s=30, label='top10')
-    ax_map.set_title(f'all active fire date={time_report}',fontsize=20)
+    ax_map.set_title(f'all active fire date={(time_report+pd.Timedelta(minutes=30))}',fontsize=20)
     plt.legend()
              
     fig.savefig(f"{params['general']['reportDir']}/general_scatterPlot.png")
@@ -425,7 +680,7 @@ if __name__ == '__main__':
         name = row["name"]
         frp = row["frp"]
         area = row["area_km2"]
-        time = row["time"]
+        time_fire = row["time"]
         image_url = row["image"]  # This is the FRP time series image
         ffmnh_url = row["ffmnhUrl"]    
 
@@ -439,11 +694,14 @@ if __name__ == '__main__':
         #try:
         frp_img_path = f"{params['general']['root_data']}/{sensorName}/{'/'.join(image_url.split('/')[-3:])}"
         frp_img = Image.open(frp_img_path) 
+        width, height = frp_img.size
+        crop_box = (0, 0.07*height, width, height)
+        frp_img_cropped = frp_img.crop(crop_box)
         #response = requests.get(image_url,verify=False)
         #response.raise_for_status()
         #frp_img = Image.open(BytesIO(response.content))
         XX_FIRE_FRP = f"frp{row['id_fire_event']}.png"
-        frp_img.save(f"{params['general']['reportDir']}/{XX_FIRE_FRP}")
+        frp_img_cropped.save(f"{params['general']['reportDir']}/{XX_FIRE_FRP}")
         #except Exception as e:
         #    print(f"FRP image for {name} not available: {e}")
         #    XX_FIRE_FRP=''
@@ -457,7 +715,7 @@ if __name__ == '__main__':
         XX_FFMNH_URL = ffmnh_url
 
 
-        # === 1.1. cart vegetation around fire ===
+        # === 1. cart vegetation around fire ===
         with rasterio.open(f"{params['general']['root_data']}/CorineLandCover/u2018_clc2018_v2020_20u1_raster100m/DATA/U2018_CLC2018_V2020_20u1.tif") as src:
             # Reproject bounding box to raster CRS
             lon_min, lon_max, lat_min, lat_max = bounding_box_km(lon, lat, half_side_km=5)
@@ -559,24 +817,37 @@ if __name__ == '__main__':
         plt.close(fig)
 
         #local pof image
+        ###############
         pof_j0 = ds_pof.sel(time=time_report+pd.Timedelta(days=0),method='nearest')['MODEL_FIRE']
-        plot_pof(params,pof_j0, f'pof_{row["id_fire_event"]}_j0.png',extent=bounding_box_km(lon, lat),fireloc=(lon,lat),flag_scalebar=True) 
+        plot_pof(params,pof_j0, f'pof_{row["id_fire_event"]}_j0.png',extent=bounding_box_km(lon, lat,half_side_km=50),fireloc=(lon,lat),flag_scalebar=True) 
         pof_j1 = ds_pof.sel(time=time_report+pd.Timedelta(days=1),method='nearest')['MODEL_FIRE']
-        plot_pof(params,pof_j1, f'pof_{row["id_fire_event"]}_j1.png',extent=bounding_box_km(lon, lat),fireloc=(lon,lat))
+        plot_pof(params,pof_j1, f'pof_{row["id_fire_event"]}_j1.png',extent=bounding_box_km(lon, lat,half_side_km=50),fireloc=(lon,lat))
         pof_j2 = ds_pof.sel(time=time_report+pd.Timedelta(days=2),method='nearest')['MODEL_FIRE']
-        plot_pof(params,pof_j2, f'pof_{row["id_fire_event"]}_j2.png',extent=bounding_box_km(lon, lat),fireloc=(lon,lat),flag_colorbar=True)
+        plot_pof(params,pof_j2, f'pof_{row["id_fire_event"]}_j2.png',extent=bounding_box_km(lon, lat,half_side_km=50),fireloc=(lon,lat),flag_colorbar=True)
         XX_FIRE_ID=f"{row['id_fire_event']}"
         
-        # === 1. Metadata ===
-        XX_METADATA = f"Last obs - time: {time.strftime('%Y%m%dT%H:%MZ')} \quad FRP: {frp:5.2f} MW \quad Area: {area:5.2f} km$^{2}$ \quad lon: {lon_dms[0]}°{lon_dms[1]}'{lon_dms[2]} \quad lat: {lat_dms[0]}°{lat_dms[1]}'{lat_dms[2]}\""
+        # === 2. Metadata ===
+        XX_METADATA = f"Last obs - time: {time_fire.strftime('%Y%m%dT%H:%MZ')} \quad FRP: {frp:5.2f} MW \quad Area: {area:5.2f} km$^{2}$ \quad \href{{https://app.sedoo.fr/euburn/?mlat={lat}&mlon={lon}&mmessage={XX_FIRE_NAME}}}{{lon: {lon_dms[0]}°{lon_dms[1]}'{lon_dms[2]} \quad lat: {lat_dms[0]}°{lat_dms[1]}'{lat_dms[2]}}}\""
+        
+        # === 3. rgb ===
+        time_ = time_fire
+        _, bminbmax = plot_rgb(params, time_,                            lon, lat, 0, XX_FIRE_ID )
+        plot_rgb(params, time_-pd.Timedelta(minutes=  30), lon, lat, 1, XX_FIRE_ID, bminbmax )
+        plot_rgb(params, time_-pd.Timedelta(minutes=2*30), lon, lat, 2, XX_FIRE_ID, bminbmax )
+
+        # === 4. rgb ===
+        time_ = time_fire 
+        _, irRange = plot_ir(params, time_,               lon, lat, 0, XX_FIRE_ID, None, flag_colorbar=True)
+        plot_ir(params, time_-pd.Timedelta(minutes=  30), lon, lat, 1, XX_FIRE_ID, irRange)
+        plot_ir(params, time_-pd.Timedelta(minutes=2*30), lon, lat, 2, XX_FIRE_ID, irRange)
 
         #dummy rgb and ir38
-        shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h0.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h0.png")
-        shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h1.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h1.png")
-        shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h2.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h2.png")
-        shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h0.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h0.png")
-        shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h1.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h1.png")
-        shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h2.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h2.png")
+        #shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h0.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h0.png")
+        #shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h1.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h1.png")
+        #shutil.copy( f"{params['general']['srcDir']}/fireReport/rgb_184_h2.png",f"{params['general']['reportDir']}/rgb_{XX_FIRE_ID}_h2.png")
+        #shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h0.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h0.png")
+        #shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h1.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h1.png")
+        #shutil.copy( f"{params['general']['srcDir']}/fireReport/ir38_184_h2.png",f"{params['general']['reportDir']}/ir38_{XX_FIRE_ID}_h2.png")
 
 
         #add content to line for text file
@@ -589,4 +860,4 @@ if __name__ == '__main__':
     shutil.copy(f"{params['general']['reportDir']}/fireReport.pdf", f"{dir_report}/{time_report.strftime('%Y%m%d')}/fires_FR_{time_last_geojson}.pdf")
     print(f"✅ PDF created: {dir_report}/fires_FR_{time_last_geojson}.pdf")
     
-    #shutil.rmtree(params['general']['reportDir'])
+    shutil.rmtree(params['general']['reportDir'])

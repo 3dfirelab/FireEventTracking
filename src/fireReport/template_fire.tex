@@ -21,34 +21,45 @@
     \end{subfigure}
 \end{figure}
 \vspace{-2em}
-\small{ FOREFIRE-MesoNH simulation:  \url{XX_FFMNH_URL} }
+\noindent
+\small{ FOREFIRE-MesoNH simulation:  \url{XX_FFMNH_URL} }\\
+\small{ FET fire ID: XX_FIRE_ID }
 \vspace{-1em}
 \subsection*{POF over next 3 days}
 \vspace{-1em}
 \begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.31\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{pof_XX_FIRE_ID_j0.png} % Replace with actual PNG
-    \end{subfigure}
-    %\hfill
-    \begin{subfigure}[b]{0.31\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{pof_XX_FIRE_ID_j1.png} % Replace with actual PNG
-    \end{subfigure}
-    \begin{subfigure}[b]{0.36\textwidth}
-        \centering
-        \includegraphics[width=0.85\linewidth]{pof_XX_FIRE_ID_j2.png} % Replace with actual PNG
-        \raisebox{2mm}{\includegraphics[width=0.13\linewidth]{pof_XX_FIRE_ID_j2_colorbar.png}} % Replace with actual PNG
-    \end{subfigure}
+    \raggedright  % replaces \centering
+    % Wrap main 3 images in a box of fixed width
+    \begin{minipage}{\textwidth}
+        \begin{minipage}[t]{0.96\textwidth} % Main row width (leave space for colorbar)
+            \begin{subfigure}[b]{0.32\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{pof_XX_FIRE_ID_j0.png}
+            \end{subfigure}
+            \begin{subfigure}[b]{0.32\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{pof_XX_FIRE_ID_j1.png}
+            \end{subfigure}
+            \begin{subfigure}[b]{0.32\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{pof_XX_FIRE_ID_j2.png}
+            \end{subfigure}
+        \end{minipage}%
+        \begin{minipage}[t]{0.0384\textwidth}
+            \raggedright
+            \includegraphics[width=\linewidth]{pof_XX_FIRE_ID_j2_colorbar.png}
+        \end{minipage}
+    \end{minipage}
+
 \end{figure}
 
 
 \vspace{-1em}
-\subsection*{RGB over last 3h}
+\subsection*{RGB over last 1h}
 \vspace{-1em}
 \begin{figure}[H]
-    \centering
+    \raggedright  % replaces \centering
+    \begin{minipage}{0.96\textwidth}
     \begin{subfigure}[b]{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{rgb_XX_FIRE_ID_h0.png} % Replace with actual PNG
@@ -62,25 +73,35 @@
         \centering
         \includegraphics[width=\linewidth]{rgb_XX_FIRE_ID_h2.png} % Replace with actual PNG
     \end{subfigure}
+    \end{minipage}%
 \end{figure}
 
 \vspace{-1em}
-\subsection*{IR38 over last 3h}
+\subsection*{IR38 over last 1h}
 \vspace{-1em}
 \begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.32\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{ir38_XX_FIRE_ID_h0.png} % Replace with actual PNG
-    \end{subfigure}
-    %\hfill
-    \begin{subfigure}[b]{0.32\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{ir38_XX_FIRE_ID_h1.png} % Replace with actual PNG
-    \end{subfigure}
-    \begin{subfigure}[b]{0.32\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{ir38_XX_FIRE_ID_h2.png} % Replace with actual PNG
-    \end{subfigure}
+    \raggedright  % replaces \centering
+    % Wrap main 3 images in a box of fixed width
+    \begin{minipage}{\textwidth}
+        \begin{minipage}[t]{0.96\textwidth} % Main row width (leave space for colorbar)
+            \begin{subfigure}[b]{0.32\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{ir38_XX_FIRE_ID_h0.png}
+            \end{subfigure}
+            \begin{subfigure}[b]{0.32\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{ir38_XX_FIRE_ID_h1.png}
+            \end{subfigure}
+            \begin{subfigure}[b]{0.32\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{ir38_XX_FIRE_ID_h2.png}
+            \end{subfigure}
+        \end{minipage}%
+        \begin{minipage}[t]{0.0384\textwidth}
+            \raggedright
+            \includegraphics[width=\linewidth]{ir38_XX_FIRE_ID_h0_colorbar.png}
+        \end{minipage}
+    \end{minipage}
 \end{figure}
+
 
