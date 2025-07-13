@@ -857,7 +857,8 @@ if __name__ == '__main__':
     generate_report(params,XX_TABLE_HERE, XX_NUMBER_OF_FIRE, time_report, linesFires)
 
     os.makedirs(f"{dir_report}/{time_report.strftime('%Y%m%d')}",exist_ok=True)
-    shutil.copy(f"{params['general']['reportDir']}/fireReport.pdf", f"{dir_report}/{time_report.strftime('%Y%m%d')}/fires_FR_{time_last_geojson}.pdf")
+    XX_TIME_REPORT_end = (time_report+pd.Timedelta(minutes=30)).strftime('%Y-%m-%d_%HH%MMZ')
+    shutil.copy(f"{params['general']['reportDir']}/fireReport.pdf", f"{dir_report}/{time_report.strftime('%Y%m%d')}/fires_FR_{XX_TIME_REPORT_end}.pdf")
     print(f"✅ PDF created: {dir_report}/fires_FR_{time_last_geojson}.pdf")
     
     shutil.rmtree(params['general']['reportDir'])

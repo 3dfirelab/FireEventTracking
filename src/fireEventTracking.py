@@ -38,6 +38,7 @@ import polyline
 import requests 
 import json 
 import socket
+import matplotlib.dates as mdates
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -1017,10 +1018,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 mpl.rcParams['font.size'] = 20.
                 mpl.rcParams['xtick.labelsize'] = 18.
                 mpl.rcParams['ytick.labelsize'] = 18.
-                mpl.rcParams['figure.subplot.left'] = .1
-                mpl.rcParams['figure.subplot.right'] = .95
-                mpl.rcParams['figure.subplot.top'] = .95
-                mpl.rcParams['figure.subplot.bottom'] = .12
+                mpl.rcParams['figure.subplot.left'] = .15
+                mpl.rcParams['figure.subplot.right'] = .9
+                mpl.rcParams['figure.subplot.top'] = .92
+                mpl.rcParams['figure.subplot.bottom'] = .2
                 mpl.rcParams['figure.subplot.hspace'] = 0.05
                 mpl.rcParams['figure.subplot.wspace'] = 0.05  
 
@@ -1029,13 +1030,15 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 ax.plot(event.times, event.frps, marker='o', linestyle='-')
                 ax.set_xlabel('time')
                 ax.set_ylabel('FRP (MW)')
-                ax.set_title(' '.join(event.fire_name.split('_')[2:4]),pad=5)
-                
+                ax.set_title(' '.join(event.fire_name.split('_')[2:4]),pad=9)
+
                 if len(event.frps) == 1:
                     t = event.times[0]
                     ax.set_xlim(t - timedelta(hours=1), t + timedelta(hours=1))
                     ax.set_xticks([t])
                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+                
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=45)  # Rotate tick labels
 
                 # File paths
                 tmp_file = os.path.join(tmp_dir, f"{event.id_fire_event:09d}.png")
