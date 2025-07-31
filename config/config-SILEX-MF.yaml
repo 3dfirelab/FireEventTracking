@@ -15,6 +15,7 @@ event:
   start_time: '2025-06-28_0000'
   mask_HS: mask_hs_600m_europe.nc
   eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
+  cloudMask_mtg: "FCI/RASTER/cloudMask/"
 postproc:
   dir_FWI:  AROME/FWI
   dir_WIND: AROME/FORECAST/WIND/

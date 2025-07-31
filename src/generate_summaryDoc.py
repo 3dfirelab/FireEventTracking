@@ -461,8 +461,13 @@ def plot_ir(params, time_fire, lon, lat, hourFire, XX_FIRE_ID, irRange, flag_col
         irmin = ir.min()
         irmax = ir.max()
     else:
-        irmin = irRange[0]-10
-        irmax = irRange[1]+10
+        if irRange != None:
+            irmin = irRange[0]
+            irmax = irRange[1]
+        else:
+            irmin = ir.min()
+            irmax = ir.max()
+
 
     # Plot the vegetation map
     im = ax.imshow(

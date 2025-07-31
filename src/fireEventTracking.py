@@ -1028,7 +1028,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 fig = plt.figure(figsize=(10, 5))
                 ax = plt.subplot(111)
                 ax.plot(event.times, event.frps, marker='o', linestyle='-')
-                ax.set_xlabel('time')
+                #ax.set_xlabel('time')
                 ax.set_ylabel('FRP (MW)')
                 ax.set_title(' '.join(event.fire_name.split('_')[2:4]),pad=9)
 
@@ -1038,7 +1038,8 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                     ax.set_xticks([t])
                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
                 
-                ax.set_xticklabels(ax.get_xticklabels(), rotation=45)  # Rotate tick labels
+                #ax.set_xticklabels(ax.get_xticklabels(), rotation=45)  # Rotate tick labels
+                ax.tick_params(axis='x', rotation=45)
 
                 # File paths
                 tmp_file = os.path.join(tmp_dir, f"{event.id_fire_event:09d}.png")
