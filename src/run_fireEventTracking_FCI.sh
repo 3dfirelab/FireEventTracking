@@ -1,11 +1,11 @@
 #!/bin/bash
 source ~/.myKeys.sh
-export srcDir=/home/paugamr/Src/FireEventTracking/src
-"$srcDir"/mount_aeris.sh
+export srcDir=/home/paugam/Src/FireEventTracking/src
+#"$srcDir"/mount_aeris.sh
 
-export dataDir=/home/paugamr/data/FCI/hotspots
-export ctrlDir=/home/paugamr/data/FCI/log
-export logDir=/home/paugamr/data/FCI/fire_events/log
+export dataDir=/media/paugam/gast/AERIS_2/FCI/hotspots
+export ctrlDir=/media/paugam/gast/AERIS_2/FCI/log
+export logDir=/media/paugam/gast/AERIS_2/FCI/fire_events/log
 if [ ! -d "$logDir" ]; then
     mkdir -p "$logDir"
 fi
@@ -14,7 +14,7 @@ fi
 if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     touch "$ctrlDir/lock_FireEventTracking.txt"
 
-    /home/paugamr/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName SILEX-MF --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
+    /home/paugam/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName ribaute --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
 
     #rm "$ctrlDir/runFireEvent.txt"
     rm "$ctrlDir/lock_FireEventTracking.txt"

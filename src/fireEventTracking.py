@@ -1234,6 +1234,11 @@ def run_fire_tracking(args):
         start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
         end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
     
+    elif inputName == 'ribaute': 
+        params = init(inputName,sensorName,log_dir) 
+        start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
+        end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
+    
     elif 'SILEX' in inputName : 
         params = init(inputName,sensorName,log_dir) 
         if os.path.isfile(log_dir+'/timeControl.txt'): 
