@@ -1,13 +1,19 @@
-
-
+import os
+import numpy as np
+import rasterio
+import geopandas as gpd
+from rasterio.features import rasterize
+from scipy.ndimage import binary_dilation
+import xarray as xr
+import rioxarray  # important: registers the ".rio" accessor
 
 if __name__ == '__main__':
 
-    root_data                         = '/mnt/dataEstrella2/SILEX/'
-    file_HSDensity_ESAWorldCover      = root_data + 'ESAWorldCover/HSDensity/hs_density_europe.vrt'
+    root_data                         = '/home/vost/Data/'
+    file_HSDensity_ESAWorldCover      = root_data + 'HotspotDensity2024/HSDensity/hs_density_europe.vrt'
     threshold_HSDensity_ESAWorldCover = 11 
-    file_polygonIndus_OSM             = root_data + 'OSM_IndustrialZone/industrialZone_osmSource-europe.geojson'
-    root_data_local                   = '../../data_loca/'
+    file_polygonIndus_OSM             = root_data + 'OSM/industrialZone_osmSource-europe.geojson'
+    root_data_local                   = '../../data_local/'
     out_mask_name = 'mask_hs_600m_europe'
 
     maskHS_da = None
@@ -19,7 +25,7 @@ if __name__ == '__main__':
             transform = src.transform
             crs = src.crs
             threshold = threshold_HSDensity_ESAWorldCover
-
+    
         # Apply mask directly using NumPy vectorization
         mask_HS = (HSDensity > threshold).astype(np.uint8)
 
@@ -33,11 +39,11 @@ if __name__ == '__main__':
 
         # Create DataArray and attach CRS
         maskHS_da = xr.DataArray(
-            mask_HS,
-            dims=["y", "x"],
-            coords={"y": y_coords, "x": x_coords},
-        ).rio.write_crs(crs, inplace=False)
-        
+                mask_HS,
+                dims=["y", "x"],
+                coords={"y": y_coords, "x": x_coords},
+            )
+        maskHS_da.rio.write_crs(crs, inplace=True)
         
         #add OSM industrial polygon to the mask
         indusAll = gpd.read_file(file_polygonIndus_OSM).to_crs(crs) 
