@@ -319,6 +319,8 @@ def cache_file(params, fireEvents_files, max_workers=16):
 
 ####################################################
 def post_on_discord_and_runffMNH(params,event):
+   
+    return None 
     
     if socket.gethostname() == 'pc70852': return None
     
@@ -1239,7 +1241,7 @@ def run_fire_tracking(args):
         start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
         end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
     
-    elif 'SILEX' in inputName : 
+    elif ('SILEX' in inputName) or ('PORTUGAL' in inputName) : 
         params = init(inputName,sensorName,log_dir) 
         if os.path.isfile(log_dir+'/timeControl.txt'): 
             with open(log_dir+'/timeControl.txt','r') as f:

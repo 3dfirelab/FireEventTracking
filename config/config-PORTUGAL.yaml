@@ -1,0 +1,22 @@
+# config.yaml
+general:
+  domain: -10,36,-5,44
+  domainName: 'PORTUGAL'
+  crs: 3035
+  use_sedoo_drive: False 
+  root_data: /home/vost/Data/
+hs:
+  dir_data: ORIGIN/hotspots
+  sats: ['']
+event:
+  dir_data: ORIGIN/fire_events 
+  dir_geoJson: ORIGIN/fire_events/GeoJson
+  dir_frp: ORIGIN/fire_events/FRP
+  start_time: '2025-08-11_0000'
+  mask_HS: mask_hs_600m_europe.nc
+  eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
+  cloudMask_mtg: "FCI/RASTER/cloudMask/"
+postproc:
+  dir_FWI:  AROME/FWI
+  dir_WIND: AROME/FORECAST/WIND/
+

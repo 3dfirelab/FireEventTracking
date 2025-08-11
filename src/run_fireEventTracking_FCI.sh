@@ -14,16 +14,13 @@ fi
 if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     touch "$ctrlDir/lock_FireEventTracking.txt"
 
-    /home/paugam/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName ribaute --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
+    /home/vost/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName PORTUGAL --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
 
     #rm "$ctrlDir/runFireEvent.txt"
     rm "$ctrlDir/lock_FireEventTracking.txt"
 
     #to concatenate last 2 days on the website
-    #/home/paugamr/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
+    #/home/vost/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
 fi
 
-#if grep -qs "[[:space:]]$MOUNT_POINT[[:space:]]" /proc/self/mountinfo; then
-#    umount $MOUNT_POINT 
-#fi
 
