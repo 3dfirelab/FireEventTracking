@@ -36,7 +36,37 @@ importlib.reload(interpArrivalTime)
 importlib.reload(ROSlib)
 
 #########################
-def getCloudMask(params, time, polygon):
+def getCloudMask(params, target_time, polygon):
+
+    #find cloud mask file
+    cloudmask_dir = Path(params['event']['dir_cloudMask'])
+
+    # Collect all files with their datetime from filename
+    files = []
+    for root, dirs, filenames in os.walk(cloudmask_dir):
+        for fn in filenames:
+            if fn.endswith('.nc'):
+                # Example: fci-cm-SILEX-2025218.0000.nc
+                # Extract YYYYDOY.HHMM
+                try:
+                    doy_str = fn.split('-')[3]  # '2025218.0000.nc' part
+                    yyyydoy, hm = doy_str.split('.')[:2]  # '2025218', '0000'
+                    dt = pd.to_datetime(yyyydoy, format='%Y%j') \
+                           + pd.Timedelta(hours=int(hm[:2]), minutes=int(hm[2:]))
+                    files.append((dt.tz_localize('UTC'), Path(root) / fn))
+                except Exception:
+                    pass
+
+    # Filter for dates <= target_time
+    files_before = [(dt, f) for dt, f in files if dt <= target_time]
+
+    if not files_before:
+       return np.nan 
+
+    # Pick the one closest to target_time
+    closest_dt, closest_file = max(files_before, key=lambda x: x[0])
+
+    ds = xr.open_dataset(closest_file)
 
     pdb.set_trace()
 
@@ -82,7 +112,7 @@ class Event:
 
         self.id_fire_event_dad = []
 
-        self.cloudMask = getCloudMask(params, self.times[-1], self.ctrs.iloc[-1])
+        #self.cloudMask = getCloudMask(params, self.times[-1], self.ctrs.iloc[-1])
 
 
     def add(self, cluster, ctr, crs, hs_all):
