@@ -1265,7 +1265,7 @@ def run_fire_tracking(args):
             else:
                 end = end.replace(minute=30) 
         
-        end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
+        #end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
     else:
         print('missing inputName')
         sys.exit()
