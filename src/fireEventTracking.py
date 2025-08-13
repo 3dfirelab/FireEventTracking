@@ -252,8 +252,10 @@ def init(config_name, sensorName, log_dir):
     if 'dir_frp' in params['event'].keys():
         params['event']['dir_frp'] = params['general']['root_data'] + params['event']['dir_frp'].replace('ORIGIN',sensorName)
         os.makedirs(params['event']['dir_frp'],exist_ok=True)
+    if 'dir_cloudMask' in params['event'].keys():
+        params['event']['dir_cloudMask'] = params['general']['root_data'] + params['event']['dir_cloudMask'].replace('ORIGIN',sensorName)
+        os.makedirs(params['event']['dir_cloudMask'],exist_ok=True)
     
-
     return params
   
 
@@ -1266,6 +1268,11 @@ def run_fire_tracking(args):
                 end = end.replace(minute=30) 
         
         end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
+        
+
+        print('hard set end time')
+        end = datetime.strptime('2025-08-06_1000', '%Y-%m-%d_%H%M')
+    
     else:
         print('missing inputName')
         sys.exit()
@@ -1340,6 +1347,7 @@ if __name__ == '__main__':
     '''
     print('FET start!')
     importlib.reload(hstools)
+    importlib.reload(fireEvent)
     src_dir = os.path.dirname(os.path.abspath(__file__))
   
     parser = argparse.ArgumentParser(description="fireEventTracking")

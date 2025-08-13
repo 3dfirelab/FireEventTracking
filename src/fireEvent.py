@@ -35,13 +35,18 @@ import ros as ROSlib
 importlib.reload(interpArrivalTime)
 importlib.reload(ROSlib)
 
+#########################
+def getCloudMask(params, time, polygon):
+
+    pdb.set_trace()
+
 
 ##########################
 class Event: 
     _id_counter=0
 
 
-    def __init__(params, self, cluster, ctr, crs, hs_all, gdf_postcode): 
+    def __init__(self,params, cluster, ctr, crs, hs_all, gdf_postcode): 
         self.id_fire_event = Event._id_counter
         Event._id_counter += 1
         
@@ -77,6 +82,7 @@ class Event:
 
         self.id_fire_event_dad = []
 
+        self.cloudMask = getCloudMask(params, self.times[-1], self.ctrs.iloc[-1])
 
 
     def add(self, cluster, ctr, crs, hs_all):

@@ -1,11 +1,19 @@
 #!/bin/bash
 source ~/.myKeys.sh
-export srcDir=/home/vost/Src/FireEventTracking/src
+if [ "$(hostname)" = "portmtg" ]; then
+    export srcDir=/home/vost/Src/FireEventTracking/src
+    export rootDataDir=/home/vost/Data
+    export mambaDir=/home/vost/miniforge3/condabin/
+elif [ "$(hostname)" = "pc70852" ]; then
+    export srcDir=/home/paugam/Src/FireEventTracking/src
+    export rootDataDir=/mnt/media/paugam/gast/AERIS_2
+    export mambaDir=/home/paugam/miniforge3/condabin/
+fi
 #"$srcDir"/mount_aeris.sh
 
-export dataDir=/home/vost/Data/FCI/hotspots
-export ctrlDir=/home/vost/Data/FCI/log
-export logDir=/home/vost/Data/FCI/fire_events/log
+export dataDir=$rootDataDir/FCI/hotspots
+export ctrlDir=$rootDataDir/FCI/log
+export logDir=$rootDataDir/FCI/fire_events/log
 if [ ! -d "$logDir" ]; then
     mkdir -p "$logDir"
 fi
@@ -14,13 +22,13 @@ fi
 if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     touch "$ctrlDir/lock_FireEventTracking.txt"
 
-    /home/vost/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName PORTUGAL --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
+    $mambaDir/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName PORTUGAL --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
 
     #rm "$ctrlDir/runFireEvent.txt"
     rm "$ctrlDir/lock_FireEventTracking.txt"
 
     #to concatenate last 2 days on the website
-    /home/vost/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
+    $mambaDir//mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
 fi
 
 
