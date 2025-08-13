@@ -805,7 +805,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             #if no fire event were initialized, we set all cluster as fire event
             print(' create ', end=' |')
             for (_,cluster), (_,ctr) in zip(fireCluster.iterrows(),fireCluster_ctr.iterrows()):
-                event = fireEvent.Event(cluster,ctr,fireCluster.crs,hsgdf_all_raw,gdf_postcode) 
+                event = fireEvent.Event(params, cluster,ctr,fireCluster.crs,hsgdf_all_raw,gdf_postcode) 
                 fireEvents.append(event)
                 post_on_discord_and_runffMNH(params,event)
                 #if event.id_fire_event == 242: pdb.set_trace()
@@ -940,7 +940,7 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
                 #if 14634 in cluster.indices_hs: pdb.set_trace()
                 #if cluster.frp in gdf_activeEvent['frp'].values: pdb.set_trace()
                 #print('????????????????? new event')
-                new_event = fireEvent.Event(cluster,ctr,fireCluster.crs, hsgdf_all_raw,gdf_postcode) 
+                new_event = fireEvent.Event(params,cluster,ctr,fireCluster.crs, hsgdf_all_raw,gdf_postcode) 
                 fireEvents.append(new_event)
                 post_on_discord_and_runffMNH(params,new_event)
                 #if new_event.id_fire_event == 242: pdb.set_trace()

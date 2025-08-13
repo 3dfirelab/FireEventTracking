@@ -41,7 +41,7 @@ class Event:
     _id_counter=0
 
 
-    def __init__(self, cluster, ctr, crs, hs_all, gdf_postcode): 
+    def __init__(params, self, cluster, ctr, crs, hs_all, gdf_postcode): 
         self.id_fire_event = Event._id_counter
         Event._id_counter += 1
         
