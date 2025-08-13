@@ -186,6 +186,7 @@ def load_hs4lastObsAllSat(day,hour,params):
         #    pdb.set_trace()
         #    gdf["timestamp"] = pd.to_datetime(gdf['ACQTIME'].astype(str), format='%Y%m%d%H%M%S')
 
+    
     return gdf.to_crs(params['general']['crs']).reset_index(drop=True)
 
 
@@ -195,7 +196,7 @@ def convert_acqtime(val, dt_ref):
         if val < 600:
             return dt_ref + timedelta(seconds=val)
         else:
-            return datetime.strptime(str(val), '%Y%m%d%H%M%S')
+            return datetime.strptime( f"{int(val):013d}" , '%Y%m%d%H%M%S')
     except:
         return pd.NaT  # Handle unexpected values safely
 

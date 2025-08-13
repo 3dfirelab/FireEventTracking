@@ -1,11 +1,11 @@
 #!/bin/bash
 source ~/.myKeys.sh
-export srcDir=/home/paugam/Src/FireEventTracking/src
+export srcDir=/home/vost/Src/FireEventTracking/src
 #"$srcDir"/mount_aeris.sh
 
-export dataDir=/media/paugam/gast/AERIS_2/FCI/hotspots
-export ctrlDir=/media/paugam/gast/AERIS_2/FCI/log
-export logDir=/media/paugam/gast/AERIS_2/FCI/fire_events/log
+export dataDir=/home/vost/Data/FCI/hotspots
+export ctrlDir=/home/vost/Data/FCI/log
+export logDir=/home/vost/Data/FCI/fire_events/log
 if [ ! -d "$logDir" ]; then
     mkdir -p "$logDir"
 fi
@@ -20,7 +20,7 @@ if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     rm "$ctrlDir/lock_FireEventTracking.txt"
 
     #to concatenate last 2 days on the website
-    #/home/vost/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
+    /home/vost/miniforge3/condabin/mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
 fi
 
 

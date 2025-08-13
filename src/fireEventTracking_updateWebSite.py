@@ -10,8 +10,8 @@ import geopandas as gpd
 import pandas as pd
 
 # Define source and destination
-source_dir = '/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/'
-dest_file = '/mnt/homeEstrella/WebSite/leaflet/data/firEvents_merged_last2days.geojson'
+source_dir = '/home/vost/Data/FCI/fire_events/'
+dest_file = '/home/vost/WebSite/leaflet/data/firEvents_merged_last2days.geojson'
 
 #SELECT LAST FILES over the last 2 days
 # Define pattern to extract datetime from filename
@@ -70,26 +70,27 @@ for f in geojson_files:
 if gdfs:
     shutil.move(output_path_merged, dest_file)
     try:
-        shutil.copy2(source_dir+ 'log/fireEventTracking.log', '/mnt/homeEstrella/WebSite/leaflet/data/logs/fireEventTracking.log')
+        shutil.copy2(source_dir+ 'log/fireEventTracking.log', '/home/vost/WebSite/leaflet/data/logs/fireEventTracking.log')
     except: 
         pass
     print(f"Moved latest file: {output_path_merged} → {dest_file}")
     
     #and push to corte
-    try: 
-        print('--') 
-        url = "https://forefire.univ-corse.fr/live/getRonan.php"
-        headers = {
-                    "Content-Type": "application/json"
-                    }
-        with open(latest_file, "r") as f:
-                geojson_dict = json.load(f)
-        response = requests.post(url, headers=headers, data=json.dumps(geojson_dict))
+    if False:
+        try: 
+            print('--') 
+            url = "https://forefire.univ-corse.fr/live/getRonan.php"
+            headers = {
+                        "Content-Type": "application/json"
+                        }
+            with open(latest_file, "r") as f:
+                    geojson_dict = json.load(f)
+            response = requests.post(url, headers=headers, data=json.dumps(geojson_dict))
 
-        print("Status code:", response.status_code)
-        print("Response:", response.text)
-        print('--') 
-    except: 
-        pass
+            print("Status code:", response.status_code)
+            print("Response:", response.text)
+            print('--') 
+        except: 
+            pass
 else:
     print("No matching files found.")

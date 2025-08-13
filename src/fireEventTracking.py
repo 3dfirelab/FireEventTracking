@@ -642,7 +642,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
        
 
         # Convert to hours and minutes
-        hours = int(delta_seconds // 3600)
+        try:
+            hours = int(delta_seconds // 3600)
+        except:
+            pdb.set_trace()
         minutes = int((delta_seconds % 3600) // 60)
         string_sign = "+" if sign_delta_seconds >= 0 else "-"
         print(f'\u0394t[h:m]= {string_sign} {hours:02d}:{minutes:02d} ', end=' | ')
@@ -1112,10 +1115,11 @@ def gdf_to_geojson(gdf_activeEvent, params, datetime_, name_):
    
     sensor = params['general']['sensor']
 
-    url_image_root = "https://api.sedoo.fr/aeris-euburn-silex-rest/resource/fires/{:s}/fire_events/FRP/{:09d}.png"
+    #url_image_root = "https://api.sedoo.fr/aeris-euburn-silex-rest/resource/fires/{:s}/fire_events/FRP/{:09d}.png"
+    url_image_root = "http://185.32.190.239:8000/frp/{:09d}.png"
 
     gdf_activeEvent['image'] = gdf_activeEvent.index.to_series().apply(
-                                                                        lambda x: url_image_root.format(sensor, int(x))
+                                                                        lambda x: url_image_root.format( int(x))
                                                                      )
 
     gdf_activeEvent.to_file(tmp_path, driver="GeoJSON")
