@@ -1267,10 +1267,8 @@ def run_fire_tracking(args):
             else:
                 end = end.replace(minute=30) 
         
-        end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
-        
-
-        print('hard set end time')
+        #end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
+        print('**************   hard set end time')
         end = datetime.strptime('2025-08-06_1000', '%Y-%m-%d_%H%M')
     
     else:
