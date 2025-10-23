@@ -1102,6 +1102,12 @@ def copy_file(task):
 ##############################################
 def gdf_to_gpkgfile(gdf_activeEvent, params, datetime_, name_):
     tmp_path = "./{}-{}.gpkg".format(name_, datetime_.strftime("%Y-%m-%d_%H%M"))
+    if "ABS_line" in gdf_activeEvent.keys():
+        gdf_activeEvent = gdf_activeEvent.drop(columns=["ABS_line","ABS_samp"])
+    gdf_activeEvent["ABS_LINE"] = gdf_activeEvent["ABS_LINE"].fillna(-999).astype(int)
+    gdf_activeEvent["ABS_SAMP"] = gdf_activeEvent["ABS_SAMP"].fillna(-999).astype(int)
+    gdf_activeEvent["LONGITUDE_PARALLAX"] = gdf_activeEvent["LONGITUDE_PARALLAX"].fillna(-999).astype(float)
+    gdf_activeEvent["LATITUDE_PARALLAX"] = gdf_activeEvent["LATITUDE_PARALLAX"].fillna(-999).astype(float)
     gdf_activeEvent.to_file(tmp_path, driver="GPKG")
     # Move to mounted share
     dst_path = os.path.join(params['event']['dir_data'], os.path.basename(tmp_path))
