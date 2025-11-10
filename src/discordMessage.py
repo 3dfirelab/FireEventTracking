@@ -16,7 +16,7 @@ for logger_name in ['discord', 'discord.client', 'discord.gateway', 'discord.htt
     logger.propagate = False
     logger.handlers.clear()
 
-#TOKEN = os.environ['discord_token_fire_alert']
+TOKEN = os.environ['discord_token_rerun']
 
 def send_message_to_discord(message, CHANNEL_ID):
 
@@ -57,8 +57,11 @@ def send_message_to_discord_viaAeris(message, channel):
 
 
 if __name__ == '__main__':
-    channel= 'silex-fire-alert-fci'   #int(os.environ['discord_channel_id_fire_alert_fci'])
-    send_message_to_discord_viaAeris('Message for FCI', channel)
-    channel= 'silex-fire-alert-viirs' #int(os.environ['discord_channel_id_fire_alert_viirs'])
-    send_message_to_discord_viaAeris('Message for VIIRS', channel)
+    #channel= 'silex-fire-alert-fci'   #int(os.environ['discord_channel_id_fire_alert_fci'])
+    #send_message_to_discord_viaAeris('Message for FCI', channel)
+    #channel= 'silex-fire-alert-viirs' #int(os.environ['discord_channel_id_fire_alert_viirs'])
+    #send_message_to_discord_viaAeris('Message for VIIRS', channel)
+    CHANNEL_ID = int(1431283506389975224)
+    send_message_to_discord("Test message from Python!", CHANNEL_ID )
+
 

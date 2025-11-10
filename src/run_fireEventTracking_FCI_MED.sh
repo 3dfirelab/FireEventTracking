@@ -26,7 +26,7 @@ fi
 if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     touch "$ctrlDir/lock_FireEventTracking.txt"
 
-    $mambaDir/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName SILEX --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
+    $mambaDir/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName MED --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
 
     #rm "$ctrlDir/runFireEvent.txt"
     rm "$ctrlDir/lock_FireEventTracking.txt"

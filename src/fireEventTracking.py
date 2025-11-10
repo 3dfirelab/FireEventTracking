@@ -217,7 +217,7 @@ def is_mounted(path):
     return os.path.ismount(path)
 
 ####################################################
-def init(config_name, sensorName, log_dir):
+def init(config_name, sensorName, log_dir=None):
     script_dir = Path(__file__).resolve().parent
     params = hstools.load_config(str(script_dir)+f'/../config/config-{config_name}.yaml')
  
@@ -231,7 +231,7 @@ def init(config_name, sensorName, log_dir):
     params['general']['sensor'] = sensorName
 
     if params['general']['sensor'] == 'FCI':
-        params['general']['discord_channel']= 'silex-fire-alert-fci'   #int(os.environ['discord_channel_id_fire_alert_fci'])
+        params['general']['discord_channel']= int(os.environ['discord_channel_id_fire_alert_fci']) # set to rerun
     elif params['general']['sensor'] == 'VIIRS':
         params['general']['discord_channel']= 'silex-fire-alert-viirs' #int(os.environ['discord_channel_id_fire_alert_viirs'])
 
@@ -245,7 +245,7 @@ def init(config_name, sensorName, log_dir):
 
     #create dir
     os.makedirs(params['event']['dir_data'],exist_ok=True)
-    os.makedirs(log_dir,exist_ok=True)
+    if log_dir is not None: os.makedirs(log_dir,exist_ok=True)
     if 'dir_geoJson' in params['event'].keys():
         params['event']['dir_geoJson'] = params['general']['root_data'] + params['event']['dir_geoJson'].replace('ORIGIN',sensorName)
         os.makedirs(params['event']['dir_geoJson'],exist_ok=True)
@@ -322,9 +322,9 @@ def cache_file(params, fireEvents_files, max_workers=16):
 ####################################################
 def post_on_discord_and_runffMNH(params,event):
    
-    return None 
-    
     if socket.gethostname() == 'pc70852': return None
+    if socket.gethostname() == 'andall': return None
+    
     
     if 'fire_FR' not in event.fire_name:
         event.add_ffmnhSimu('none')
@@ -332,10 +332,12 @@ def post_on_discord_and_runffMNH(params,event):
     transformer = Transformer.from_crs("EPSG:{:d}".format(params['general']['crs']), "EPSG:4326", always_xy=True)
     bell = "\U0001F514"
 
+    pdb.set_trace()
     pt = event.centers[-1]
     x, y = pt.x, pt.y 
     lon, lat = transformer.transform(x,y)
     ffmnh_info = run_ffMNH_corte(params, event, lon, lat)
+    
     if ffmnh_info is not None:
         url = f"https://forefire.univ-corse.fr/firecast/{ffmnh_info['path']}"
         loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tForeFireMNH Simulation: {url}"
@@ -344,8 +346,9 @@ def post_on_discord_and_runffMNH(params,event):
         url = f"https://www.openstreetmap.org/?mlat={lat:.6f}&mlon={lon:.6f}#map=14/{lat:.6f}/{lon:.6f}"
         loc = f"Location: Lon: {lon:.6f}, Lat: {lat:.6f}\n\t\tOpen Street Map loc: {url}"
         event.add_ffmnhSimu('none')
+   
     
-    discordMessage.send_message_to_discord_viaAeris(
+    discordMessage.send_message_to_discord(
                                             bell+f"FET: new Fire from {params['general']['sensor']}"+\
                                             f"\n\t\tfrp: {event.frps[-1]:.2f} MW"+\
                                             f'\n\t\ttime: {event.times[-1]}'+\
@@ -354,7 +357,7 @@ def post_on_discord_and_runffMNH(params,event):
                                             f'\n\t\tarea: {1.e-4*event.areas[-1]:.2f} ha' , 
                                         params['general']['discord_channel']
                                                    )
-
+    
     return ffmnh_info
 
 
@@ -366,15 +369,16 @@ def run_ffMNH_corte(params, event, lon, lat):
 
     data = {
         'command': 'init',
-        'path': f'ronanSilex{event.id_fire_event}',
+        'path': f'ronanRRSilex{event.id_fire_event}',
         'coords': f'{polyline.encode([(lat,lon)])}',
         'ventX': '0',
         'ventY': '0',
         'date': event.times[-1].strftime('%Y-%m-%dT%H:%M:%SZ'),
         'model': 'Rothermel',
         'apikey': 'DEMO',
-        'message': 'QUICK800'
-    }
+        'message': 'QUICK800',
+        'password': 'ronan',  # <-- add this field
+        }
     #print(f'ronanSilex{event.id_fire_event}')
     #print(polyline.encode([(lat,lon)]))
     #print(event.times[-1].strftime('%Y-%m-%dT%H:%M:%SZ'))
@@ -781,11 +785,16 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             else:
                 shape = alphashape.alphashape(points, alpha)
                 if (shape.is_empty): 
-                    if (len(points)<10): 
+                    if (len(points)<=10): 
                         shape = MultiPoint(points).convex_hull
                     else: 
-                        print('pb in alphashape -- empty geom geenrated')
-
+                        while shape.is_empty:
+                            shape = alphashape.alphashape(points, alpha)
+                            alpha -= 0.0001
+                            if alpha == 0.0004: break
+                        if (shape.is_empty):
+                            print('pb in alphashape -- empty geom generated')
+                            print(f'len(points) = {len(points)}')
             alpha_shapes.append({
                 'cluster_fire_event': event_id,
                 'geometry': shape
@@ -1253,7 +1262,26 @@ def run_fire_tracking(args):
         start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
         end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
     
-    elif ('SILEX' in inputName) or ('PORTUGAL' in inputName) : 
+    elif ('MED' in inputName ): 
+        params = init(inputName,sensorName,log_dir) 
+        if os.path.isfile(log_dir+'/timeControl.txt'): 
+            with open(log_dir+'/timeControl.txt','r') as f:
+                start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        else:
+            start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+   
+        if 'end_time' in params['event']: 
+            end = datetime.strptime(params['event']['end_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        else:
+            end = start + timedelta(days=1) #20 minute of MTG latence.
+            # Round down to the nearest xx:00 or xx:30
+            end = end.replace(second=0, microsecond=0)
+            if end.minute < 30:
+                end = end.replace(minute=0)
+            else:
+                end = end.replace(minute=30) 
+
+    elif ('SILEX' in inputName) or ('PORTUGAL' in inputName)  or ('MED' in inputName ): 
         params = init(inputName,sensorName,log_dir) 
         if os.path.isfile(log_dir+'/timeControl.txt'): 
             with open(log_dir+'/timeControl.txt','r') as f:
@@ -1265,13 +1293,16 @@ def run_fire_tracking(args):
         if params['general']['sensor'] == 'VIIRS':
             end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
         elif params['general']['sensor'] == 'FCI':
-            end = (datetime.now(timezone.utc) - timedelta(minutes=20)) #20 minute of MTG latence.
-            # Round down to the nearest xx:00 or xx:30
-            end = end.replace(second=0, microsecond=0)
-            if end.minute < 30:
-                end = end.replace(minute=0)
+            if 'end_time' in params['event']: 
+                end = datetime.strptime(params['event']['end_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
             else:
-                end = end.replace(minute=30) 
+                end = (datetime.now(timezone.utc) - timedelta(minutes=20)) #20 minute of MTG latence.
+                # Round down to the nearest xx:00 or xx:30
+                end = end.replace(second=0, microsecond=0)
+                if end.minute < 30:
+                    end = end.replace(minute=0)
+                else:
+                    end = end.replace(minute=30) 
         
         #end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
         #print('**************   hard set end time')

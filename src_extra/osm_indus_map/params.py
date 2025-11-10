@@ -102,6 +102,15 @@ def load_param(continent):
         distgroup = 1.e3
         lonlat_bounds = [[18., 35. , 55., 60.]] # no
         gratreso = 5
+    
+    elif continent == 'med':
+        xminAll,xmaxAll = 2.563e6, 6.737e6 
+        yminAll,ymaxAll = 7.39e5, 2.624e6
+        crs_here = 'epsg:3035'
+        bufferBorder = -1800
+        distgroup = 5.e3
+        lonlat_bounds = None # not necessary here, this is to plot land background 
+        gratreso = 15
 
     params = {'xminAll': xminAll,
               'xmaxAll': xmaxAll, 

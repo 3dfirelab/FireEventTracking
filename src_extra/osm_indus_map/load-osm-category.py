@@ -12,41 +12,27 @@ import shutil
 import warnings
 import importlib 
 import pdb 
+import re 
 
 #homebrwed
 import countries as contries_mod
 sys.path.append('../src-map/')
-import tools
+#import tools
 
 if __name__ == '__main__':
    
-    continent = 'europe'
-    dir_data = tools.get_dirData()
-    dir_out_root = '/mnt/dataEstrella2/OSM_IndustrialZone/'
-    '''
-    importlib.reload(contries_mod)
-    from countries import europe, asia, namerica, samerica, camerica, africa
+    continent = 'med'
+    dir_in_data = '/data/shared/OSM/'
+    dir_out = '/data/paugam/OSM_IndustrialZone/'
     
-    if continent == 'europe': 
-        countries_selection = europe
-    elif continent == 'asia': 
-        countries_selection = asia
-    elif continent == 'namerica': 
-        countries_selection = namerica
-    elif continent == 'samerica': 
-        countries_selection = samerica
-    elif continent == 'camerica': 
-        countries_selection = camerica
-    elif continent == 'africa': 
-        countries_selection = africa
-    '''
-    warnings.filterwarnings("ignore")
+    importlib.reload(contries_mod)
+    from countries import europe, asia, namerica, samerica, camerica, africa, med
+    
 
     flag_industrial     = True
     flag_veg_osm        = False
     
-    indir = '{:s}OSM/PerCountry-{:s}/'.format(dir_data,continent)
-    osmfiles = sorted(glob.glob(indir+'*osm.pbf'))
+    osmfiles = sorted(glob.glob(dir_in_data+'*osm.pbf'))
   
     if flag_industrial:
         print('industrial')
@@ -54,7 +40,8 @@ if __name__ == '__main__':
         print('veg-osm')
 
     for osmfile in osmfiles: 
-        country =os.path.basename(osmfile).split('-latest')[0]
+        basename = re.sub(r'-\d{6}|-latest', '', os.path.basename(osmfile).replace('.osm.pbf', ''))
+        country = basename.lower()
        
         #if country == 'netherlands': sys.exit()
         fileintmp = glob.glob('/tmp/*.osm.pbf')
@@ -66,8 +53,8 @@ if __name__ == '__main__':
 
         if flag_industrial:
              
-            outdir = '{:s}/{:s}/'.format(dir_out_root, continent)
-            tools.ensure_dir(outdir)
+            outdir = '{:s}/{:s}/'.format(dir_out, continent)
+            #tools.ensure_dir(outdir)
 
             nbreTile = len( glob.glob( osmfile.split('-latest')[0]+'*.osm.pbf') )
             if nbreTile > 1: 

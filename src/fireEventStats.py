@@ -1,0 +1,351 @@
+import numpy as np 
+import pandas as pd
+import os 
+import matplotlib as mpl
+#mpl.use('Agg')
+import matplotlib.pyplot as plt 
+import sys
+from pathlib import Path
+import importlib 
+from datetime import datetime, timezone, timedelta
+from sklearn.cluster import DBSCAN
+from shapely.geometry import Point, MultiPoint, Polygon, MultiPolygon
+from shapely.ops import unary_union
+import geopandas as gpd
+import pdb 
+import alphashape
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import matplotlib.colors as mcolors
+from scipy.spatial.distance import cdist
+import warnings
+import pickle
+import shutil
+import glob
+import socket
+import argparse
+import re 
+from bisect import bisect_left
+import rasterio
+import xarray as xr 
+from rasterio.features import rasterize
+from scipy.ndimage import binary_dilation
+from concurrent.futures import ThreadPoolExecutor
+from pyproj import Transformer
+import tempfile
+from multiprocessing import Pool
+import polyline 
+import requests 
+import json 
+import socket
+import matplotlib.dates as mdates
+
+warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
+
+#home brewed
+import hstools
+import fireEvent
+import os
+import subprocess
+import fireEventTracking as fet
+
+###############################################
+def plot(params, year, week, fireEvents, pastFireEvents, flag_plot_hs=True, flag_remove_singleHs=False):
+    # Create a figure with Cartopy
+    mpl.rcdefaults()
+    mpl.rcParams['text.usetex'] = True
+    mpl.rcParams['legend.fontsize'] = 'small'
+    mpl.rcParams['legend.fancybox'] = True
+    mpl.rcParams['figure.subplot.left'] = .1
+    mpl.rcParams['figure.subplot.right'] = .9
+    mpl.rcParams['figure.subplot.top'] = .9
+    mpl.rcParams['figure.subplot.bottom'] = .1
+    mpl.rcParams['figure.subplot.hspace'] = 0.01
+    mpl.rcParams['figure.subplot.wspace'] = 0.01  
+    fig, ax = plt.subplots(figsize=(10, 6),
+                       subplot_kw={'projection': ccrs.PlateCarree()} ) #ccrs.epsg(params['general']['crs']) })  # PlateCarree() == EPSG:4326
+
+    # Add basic map features
+    ax.coastlines(linewidth=0.2)
+    ax.add_feature(cfeature.BORDERS, linewidth=0.1)
+    ax.add_feature(cfeature.LAND, facecolor='lightgray')
+    ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
+
+    for event in fireEvents:
+        if event is None: continue
+        #if event.id_fire_event in [102]: continue
+        times_numeric = pd.to_datetime(event.times).astype(int) / 10**9  # Convert to seconds since epoch
+
+        #if len(event.times)> 0: pdb.set_trace()
+
+        # Normalize the time values to 0-1 for colormap
+        norm = mcolors.Normalize(vmin=times_numeric.min(), vmax=times_numeric.max())
+        cmap = mpl.colormaps.get_cmap('jet')
+
+        # Map each time value to a color
+        colors = [cmap(norm(t)) for t in times_numeric]
+      
+        #event.plot(ax=ax,alpha=0.4,c='k',markersize=10)
+        for (irow,row_ctr), (_,row_hs) in zip(event.ctrs.iterrows(),event.hspots.iterrows()):
+            #if mm : 
+            #    fig, ax = plt.subplots(figsize=(10, 6),
+            #           subplot_kw={'projection': ccrs.epsg(params['general']['crs']) })  # PlateCarree() == EPSG:4326
+
+            if row_ctr.geometry.geom_type == 'Point':
+                if flag_remove_singleHs: 
+                    if len(event.times) == 1: continue
+                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).plot(ax=ax, color=colors[irow], linewidth=0.1, zorder=2, alpha=0.7, markersize=1)
+            else:
+                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor=colors[irow], cmap=cmap, linewidth=1, zorder=2, alpha=0.7)
+            if flag_plot_hs:
+                points = gpd.GeoSeries([row_hs.geometry]).explode(index_parts=False).set_crs(params['general']['crs'])
+                if len(points)>0:
+                    points.to_crs(4326).plot(ax=ax, color=colors[irow], alpha=0.5, markersize=40)
+    
+    for event in pastFireEvents:
+        if flag_remove_singleHs: 
+            if len(event.times) == 1: continue
+        event.ctrs.set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor='r', alpha=0.9, linewidth=0.1, linestyle='--', zorder=1, markersize=1)
+
+    ax.set_title(f'{year} - week{week}' )
+
+    # Set extent if needed
+    extentmm=params['general']['domain'].split(',')
+    ax.set_extent([float(extentmm[i]) for i in [0,2,1,3]])
+    ax.set_aspect(1)
+    
+    # Add gridlines with labels
+    gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.5)
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': 10}
+    gl.ylabel_style = {'size': 10}
+   
+    filename = "{:s}/Fig/fireEvent-{:s}-{:d}-{:02d}.png".format(params['event']['dir_data'],params['general']['domainName'],year,week) 
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    
+    fig.savefig(filename,dpi=200)
+    plt.close(fig)
+    
+    #plt.show()
+
+
+############################
+def run_fire_stats(args):
+    inputName = args.inputName
+    sensorName = args.sensorName
+    log_dir = args.log_dir
+   
+    #log_dir = sys.argv[2]
+    #inputName = sys.argv[1]
+
+    #init dir
+    if inputName == '202504': 
+        params = fet.init(inputName,sensorName) 
+        start = datetime.strptime('2025-04-12_0000', '%Y-%m-%d_%H%M')
+        end = datetime.strptime('2025-04-15_0000', '%Y-%m-%d_%H%M')
+    
+    elif inputName == 'AVEIRO': 
+        params = fet.init(inputName,sensorName) 
+        start = datetime.strptime('2024-09-15_0000', '%Y-%m-%d_%H%M')
+        end = datetime.strptime('2024-09-20_2300', '%Y-%m-%d_%H%M')
+    
+    elif inputName == 'ofunato': 
+        params = fet.init(inputName,sensorName) 
+        start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
+        end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
+    
+    elif inputName == 'ribaute': 
+        params = fet.init(inputName,sensorName) 
+        start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
+        end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
+    
+    elif ('MED' in inputName ): 
+        params = fet.init(inputName,sensorName) 
+        if os.path.isfile(log_dir+'/timeControl.txt'): 
+            with open(log_dir+'/timeControl.txt','r') as f:
+                start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        else:
+            start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+   
+        if 'end_time' in params['event']: 
+            end = datetime.strptime(params['event']['end_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        else:
+            end = start + timedelta(days=1) #20 minute of MTG latence.
+            # Round down to the nearest xx:00 or xx:30
+            end = end.replace(second=0, microsecond=0)
+            if end.minute < 30:
+                end = end.replace(minute=0)
+            else:
+                end = end.replace(minute=30) 
+
+    elif ('SILEX' in inputName) or ('PORTUGAL' in inputName)  or ('MED' in inputName ): 
+        params = fet.init(inputName,sensorName) 
+        if os.path.isfile(log_dir+'/timeControl.txt'): 
+            with open(log_dir+'/timeControl.txt','r') as f:
+                start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        else:
+            start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        
+        #end = datetime.strptime('2025-06-27_0530', '%Y-%m-%d_%H%M')
+        if params['general']['sensor'] == 'VIIRS':
+            end = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) 
+        elif params['general']['sensor'] == 'FCI':
+            if 'end_time' in params['event']: 
+                end = datetime.strptime(params['event']['end_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+            else:
+                end = (datetime.now(timezone.utc) - timedelta(minutes=20)) #20 minute of MTG latence.
+                # Round down to the nearest xx:00 or xx:30
+                end = end.replace(second=0, microsecond=0)
+                if end.minute < 30:
+                    end = end.replace(minute=0)
+                else:
+                    end = end.replace(minute=30) 
+        
+        #end = end - timedelta(minutes=30) # so that the integration finish at time end calculated above
+        #print('**************   hard set end time')
+        #end = datetime.strptime('2025-08-06_1000', '%Y-%m-%d_%H%M')
+    
+    else:
+        print('missing inputName')
+        sys.exit()
+    
+    #make sure all time are UTC
+    start = start.replace(tzinfo=timezone.utc)
+    end   = end.replace(tzinfo=timezone.utc) #- timedelta(hours=1)
+
+    #print('########times#########')
+    #print(start)
+    #print(end)
+    #print('######################')
+   
+    if start == end: 
+        print('end == start: stop here')
+        sys.exit()
+    
+    maskHS_da = None
+    if 'mask_HS' in params['event']:
+        if os.path.isfile(f"{src_dir}/../data_local/{params['event']['mask_HS']}"):
+            maskHS_da = xr.open_dataarray(f"{src_dir}/../data_local/{params['event']['mask_HS']}").rio.write_crs("EPSG:4326", inplace=False)
+    else:
+        print(' ')
+        print('## WARNING ####################')
+        print('no hotspot mask was set in cong file')
+        print('see src_extra/create_mask_fixFire to generate one')
+        print('and set it in conf/event')
+        print('## WARNING ####################')
+        print(' ')
+
+    root = Path("/data/shared/FCI/MED_fire_events")
+
+    # regex to extract datetime from directory name
+    pattern = re.compile(r"Pickles_active_(\d{4}-\d{2}-\d{2}_\d{4})")
+
+    records = []
+
+    for dir_ in root.glob("Pickles_active_*"):
+        m = pattern.search(dir_.name)
+        if not m:
+            continue
+        dt_str = m.group(1)  # '2025-03-25_1630'
+        dt = pd.to_datetime(dt_str, format="%Y-%m-%d_%H%M")
+        
+        for pkl in dir_.glob("*.pkl"):
+            fire_id = pkl.stem  # basename without .pkl
+            records.append((fire_id, pkl, dt))
+
+    df = pd.DataFrame(records, columns=["fire_id", "file", "datetime"])
+
+    # keep only the last file per fire_id (latest datetime)
+    df_sorted = df.sort_values(by=["fire_id", "datetime"])
+    df_latest = df_sorted.groupby("fire_id").tail(1).reset_index(drop=True)
+
+    # final dataframe with filename and date
+    df_final = df_latest[["file", "datetime","fire_id"]].copy()
+
+    # assign ISO week + year (avoid collisions across years)
+    df_final["year"] = df_final["datetime"].dt.isocalendar().year
+    df_final["week"] = df_final["datetime"].dt.isocalendar().week
+    df_final["month"] = df_final["datetime"].dt.month
+    
+    # group by ISO year-week
+    grouped = df_final.groupby(["year", "week",])
+
+    data_per_week = []
+    for (year, week,), df_week in grouped:
+        print(f"Processing YEAR={year}, WEEK={week}, N={len(df_week)}")
+
+        # inner loop: iterate pkl files within the week
+        weekEvents = []
+        weekFRP = 0
+        weekNbreFire = 0 
+        weekArea_arr = []
+        weekDuration_arr = []
+        for _, row in df_week.iterrows():
+            fire_id = row["fire_id"]
+            event_file = row["file"]
+            dt = row["datetime"]
+
+            event = fireEvent.load_fireEvent(event_file)
+            weekEvents.append( event ) 
+            
+            weekFRP += np.array(event.frps).sum()
+            weekNbreFire += 1
+            
+            geom_final = event.ctrs.iloc[-1]
+            if isinstance(geom_final.geometry, (Polygon, MultiPolygon)):
+                area_event = event.ctrs.iloc[-1].geometry.area 
+            else:
+                area_event = 0
+            weekArea_arr.append(area_event)
+            
+            if len(event.times)>2: 
+                timeDuration_event = (event.times[-1]-event.times[0]).total_seconds() / 3600.
+            else:
+                timeDuration_event = 0
+            weekDuration_arr.append(timeDuration_event)
+
+        data_per_week.append([year, week, weekFRP, weekNbreFire, np.array(weekArea_arr).mean(), np.array(weekArea_arr).std(), np.array(weekDuration_arr).mean(), np.array(weekDuration_arr).std() ] )
+        plot(params, year, week, [], weekEvents, flag_plot_hs=False, flag_remove_singleHs=True)
+    
+
+    df_weekly = pd.DataFrame(
+                                data_per_week,
+                                columns=[
+                                    "year",
+                                    "week",
+                                    "total_frp",
+                                    "event_count",
+                                    "mean_area",
+                                    "std_area",
+                                    "mean_duration_h",
+                                    "std_duration_h",
+                                ]
+                            )
+    
+    df_weekly.to_csv("{:s}/Fig/{:s}-weekly.csv".format(params['event']['dir_data'],params['general']['domainName']))
+
+    return df_weekly
+
+#############################
+if __name__ == '__main__':
+#############################
+    
+    '''
+    SILEX
+    domain: -10,35,20,46
+    '''
+    #print('FET start!')
+    importlib.reload(hstools)
+    importlib.reload(fireEvent)
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+  
+    parser = argparse.ArgumentParser(description="fireEventTracking")
+    parser.add_argument("--inputName", type=str, help="name of the configuration input", )
+    parser.add_argument("--sensorName", type=str, help="name of the sensor, VIIRS or FCI", )
+    parser.add_argument("--log_dir", type=str, help="Directory for logs", default='/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/')
+
+    args = parser.parse_args()
+
+    df_weekly = run_fire_stats(args)
+

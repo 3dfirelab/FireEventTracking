@@ -28,23 +28,11 @@ if __name__ == '__main__':
     continent = args.continent
     #continent = 'asia'
     
-    dir_data = tools.get_dirData()
-    dir_out_root = '/mnt/dataEstrella2/OSM_IndustrialZone/'
+    dir_data = '/data/shared/'
+    dir_out_root = '/data/paugam/OSM_IndustrialZone/'
 
     importlib.reload(tools)
     
-    '''
-    if continent == 'europe':
-        xminAll,xmaxAll = 2500000., 7400000.
-        yminAll,ymaxAll = 1400000., 5440568.
-        crs_here = 'epsg:3035'
-        bufferBorder = -1800
-    elif continent == 'asia':
-        xminAll,xmaxAll = -1.315e7, -6.e4
-        yminAll,ymaxAll = -1.79e6, 7.93e6
-        crs_here = 'epsg:8859'
-        bufferBorder = -10000
-    '''
     params = params.load_param(continent)
     xminAll,xmaxAll = params['xminAll'], params['xmaxAll']
     yminAll,ymaxAll = params['yminAll'], params['ymaxAll']
@@ -164,5 +152,5 @@ if __name__ == '__main__':
     #plt.show()
 
     ax.set_title('Industrial Area', pad=20)
-    fig.savefig(f'{dirout}industrialArea_OSM-{contintent}.png',dpi=400)
+    fig.savefig(f'{dirout}industrialArea_OSM-{continent}.png',dpi=400)
     plt.close(fig)
