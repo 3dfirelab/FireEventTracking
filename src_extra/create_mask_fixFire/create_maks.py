@@ -12,7 +12,7 @@ if __name__ == '__main__':
     root_data                         = '/data/shared/'
     file_HSDensity_ESAWorldCover      = root_data + 'HotspotDensity2024/HSDensity_med/hs_density_med.vrt'
     threshold_HSDensity_ESAWorldCover = 11 
-    file_polygonIndus_OSM             = '/data/paugam/OSM_IndustrialZone/industrialZone_osmSource-med.geojson'
+    file_polygonIndus_OSM             = root_data + 'OSM_IndustrialZone/industrialZone_osmSource-med.geojson'
     root_data_local                   = '../../data_local/'
     out_mask_name = 'mask_hs_600m_med'
 

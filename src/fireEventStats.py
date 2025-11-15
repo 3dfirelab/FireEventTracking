@@ -39,6 +39,7 @@ import requests
 import json 
 import socket
 import matplotlib.dates as mdates
+import pickle
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -121,7 +122,7 @@ def plot(params, year, week, fireEvents, pastFireEvents, flag_plot_hs=True, flag
     gl.xlabel_style = {'size': 10}
     gl.ylabel_style = {'size': 10}
    
-    filename = "{:s}/Fig/fireEvent-{:s}-{:d}-{:02d}.png".format(params['event']['dir_data'],params['general']['domainName'],year,week) 
+    filename = "{:s}/Stats/fireEvent-{:s}-{:d}-{:02d}.png".format(params['event']['dir_data'],params['general']['domainName'],year,week) 
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     
     fig.savefig(filename,dpi=200)
@@ -222,7 +223,7 @@ def run_fire_stats(args):
     if start == end: 
         print('end == start: stop here')
         sys.exit()
-    
+   
     maskHS_da = None
     if 'mask_HS' in params['event']:
         if os.path.isfile(f"{src_dir}/../data_local/{params['event']['mask_HS']}"):
@@ -236,7 +237,8 @@ def run_fire_stats(args):
         print('## WARNING ####################')
         print(' ')
 
-    root = Path("/data/shared/FCI/MED_fire_events")
+    root = Path(params['event']['dir_data'])
+    os.makedirs(params['event']['dir_data']+'Stats/', exist_ok=True)
 
     # regex to extract datetime from directory name
     pattern = re.compile(r"Pickles_active_(\d{4}-\d{2}-\d{2}_\d{4})")
@@ -255,6 +257,7 @@ def run_fire_stats(args):
             records.append((fire_id, pkl, dt))
 
     df = pd.DataFrame(records, columns=["fire_id", "file", "datetime"])
+    df['fire_id'] = df['fire_id'].astype(int)
 
     # keep only the last file per fire_id (latest datetime)
     df_sorted = df.sort_values(by=["fire_id", "datetime"])
@@ -272,6 +275,7 @@ def run_fire_stats(args):
     grouped = df_final.groupby(["year", "week",])
 
     data_per_week = []
+    data_per_week_all = []
     for (year, week,), df_week in grouped:
         print(f"Processing YEAR={year}, WEEK={week}, N={len(df_week)}")
 
@@ -289,23 +293,54 @@ def run_fire_stats(args):
             event = fireEvent.load_fireEvent(event_file)
             weekEvents.append( event ) 
             
+            if fire_id == 141: 
+                fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+                ax=axes[0]
+                ax.plot(event.times, event.frps)
+                ax.set_ylabel('FRP (MW)')
+                ax=axes[1]
+                fros = np.array(event.fros, dtype=float)
+                fros[fros == -999] = np.nan
+                ax.plot(event.times, fros)
+                ax.set_ylabel('FROS (m/s)')
+                ax=axes[2]
+                area = np.array(event.ctrs.geometry.area, dtype=float) * 1.e-4
+                ax.plot(event.times, area)
+                ax.set_ylabel('burning Aera (ha)')
+               
+                fig, axes = plt.subplots(1, 1, figsize=(6, 6), sharex=True)
+                gdf_effis = gpd.read_file('/data/paugam/FIRES/effis_modis_ba_ribaute.geojson')
+                gdf_effis = gdf_effis.to_crs(event.ctrs.crs)
+                gdf_ = event.ctrs.copy()
+                gdf_["fros"] = np.array(fros, dtype=float)
+                gdf_["time"] = np.array(event.times)
+                gdf_ = gdf_.sort_values("time", ascending=False)
+                ax = axes
+                gdf_.plot(column='fros',cmap="viridis", legend=True, ax=ax, edgecolor="black", linewidth=0.2)
+                gdf_effis.plot(ax=ax, facecolor='none',edgecolor='r', alpha=0.7)
+                ax.set_title("FROS")
+                plt.show()
+                pdb.set_trace()
+
             weekFRP += np.array(event.frps).sum()
             weekNbreFire += 1
             
             geom_final = event.ctrs.iloc[-1]
             if isinstance(geom_final.geometry, (Polygon, MultiPolygon)):
-                area_event = event.ctrs.iloc[-1].geometry.area 
+                area_event = event.ctrs.iloc[-1].geometry.area * 1.e-4 
             else:
                 area_event = 0
             weekArea_arr.append(area_event)
             
-            if len(event.times)>2: 
+            if len(event.times)>=2: 
                 timeDuration_event = (event.times[-1]-event.times[0]).total_seconds() / 3600.
             else:
                 timeDuration_event = 0
             weekDuration_arr.append(timeDuration_event)
 
         data_per_week.append([year, week, weekFRP, weekNbreFire, np.array(weekArea_arr).mean(), np.array(weekArea_arr).std(), np.array(weekDuration_arr).mean(), np.array(weekDuration_arr).std() ] )
+        data_per_week_all.append([weekArea_arr, weekDuration_arr])
+
         plot(params, year, week, [], weekEvents, flag_plot_hs=False, flag_remove_singleHs=True)
     
 
@@ -323,7 +358,9 @@ def run_fire_stats(args):
                                 ]
                             )
     
-    df_weekly.to_csv("{:s}/Fig/{:s}-weekly.csv".format(params['event']['dir_data'],params['general']['domainName']))
+    df_weekly.to_csv("{:s}/Stats/{:s}-weekly.csv".format(params['event']['dir_data'],params['general']['domainName']))
+    with open("{:s}/Stats/{:s}-area_duration_weekly_allData.pkl".format(params['event']['dir_data'],params['general']['domainName']), "wb") as f:
+        pickle.dump(data_per_week_all, f) 
 
     return df_weekly
 

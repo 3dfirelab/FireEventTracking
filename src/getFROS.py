@@ -9,6 +9,69 @@ import matplotlib.pyplot as plt
 # -------------------------------------------------------
 # Function definitions
 # -------------------------------------------------------
+def mean_vector_line(lines):
+    """Compute a mean LineString positioned in space from a list of LineStrings."""
+    starts = []
+    ends = []
+
+    for line in lines:
+        if line.is_empty or len(line.coords) < 2:
+            continue
+        x0, y0 = line.coords[0]
+        x1, y1 = line.coords[-1]
+        starts.append((x0, y0))
+        ends.append((x1, y1))
+
+    if not starts or not ends:
+        return None
+
+    # mean start and end coordinates
+    start_mean = np.mean(starts, axis=0)
+    end_mean = np.mean(ends, axis=0)
+
+    # construct the mean line in actual space
+    mean_line = LineString([tuple(start_mean), tuple(end_mean)])
+    return mean_line
+
+
+def densify_geometry(geom, n_points_per_segment=5):
+    """Densify a LineString or Polygon by adding evenly spaced vertices along its segments."""
+    if geom.is_empty:
+        return geom
+
+    if isinstance(geom, Polygon):
+        line = geom.exterior
+        is_polygon = True
+    elif isinstance(geom, LineString):
+        line = geom
+        is_polygon = False
+    else:
+        return geom  # ignore other geometry types
+
+    coords = list(line.coords)
+    new_coords = [coords[0]]
+
+    for i in range(len(coords) - 1):
+        p1 = coords[i]
+        p2 = coords[i + 1]
+        #ax.scatter(p1[0],p1[1])
+        segment = LineString([p1, p2])
+        new_coords.append(p1)
+        # interpolate intermediate points (excluding the start)
+        for j in range(1, n_points_per_segment):
+            frac = j / n_points_per_segment
+            new_point = segment.interpolate(frac, normalized=True)
+            new_coords.append(new_point.coords[0])
+            #ax.scatter(new_coords[-1][0],new_coords[-1][1])
+
+    if is_polygon:
+        # Ensure closure
+        if new_coords[0] != new_coords[-1]:
+            new_coords.append(new_coords[0])
+        return Polygon(new_coords)
+    else:
+        return LineString(new_coords)
+
 
 def get_coords(geom):
     """Return Nx2 array of coordinates for Polygon-like geometries."""
@@ -46,7 +109,7 @@ def _is_same_geometry(a, b, tol=1e-6):
     except Exception:
         return False
 
-def _intersection_excludes_endpoints(segment, obstacle_edge, tol=0.5):
+def _intersection_excludes_endpoints(segment, obstacle_edge, tol=0.001):
     """
     Return True if an obstacle edge intersects the segment away from its endpoints.
     tol controls the exclusion radius (in CRS units) around each endpoint.
@@ -77,7 +140,7 @@ def _intersection_excludes_endpoints(segment, obstacle_edge, tol=0.5):
 
     return True
 
-def compute_max_distance(outer, inner, obstacles=None):
+def compute_max_distance(outer, inner, dt, obstacles=None):
     """
     Compute the largest distance between vertices of outer and inner polygons,
     ignoring candidate segments that intersect the boundary of any obstacle.
@@ -107,45 +170,50 @@ def compute_max_distance(outer, inner, obstacles=None):
         else:
             obstacle_edges.append(geom)
 
-    best_dist = -np.inf
-    best_outer = None
-    best_inner = None
+    best_dist  = []
+    best_outer = []
+    best_inner = []
+    
+    #fig, ax = plt.subplots()
+    #gpd.GeoDataFrame(geometry=[outer]).plot(facecolor='none', edgecolor='orange',linewidth=3,ax=ax)
+    #gpd.GeoDataFrame(geometry=[inner]).plot(facecolor='none', edgecolor='blue',linewidth=3,ax=ax)
 
     for outer_pt in outer_pts:
-        #fig, ax = plt.subplots()
         for edge in obstacle_edges:
             geoms = edge.geoms if hasattr(edge, "geoms") else [edge]
             for geom in geoms:
                 if hasattr(geom, "xy"):
                     x, y = geom.xy
-                    #ax.plot(x, y, color='k', linewidth=1)
+                    #ax.plot(x, y, color='k', linewidth=4, linestyle=':')
         for inner_pt in inner_pts:
             segment = LineString([(outer_pt[0], outer_pt[1]), (inner_pt[0], inner_pt[1])])
             if not outer.contains(segment):
                 continue
             if inner.contains(segment):
                 continue
-            if any(_intersection_excludes_endpoints(segment, obs_edge) for obs_edge in obstacle_edges):
+            if any(_intersection_excludes_endpoints(segment, obs_edge ) for obs_edge in obstacle_edges):
                 continue
 
             x, y = segment.xy
-            #ax.plot(x, y, color='red', linewidth=2)
-            #ax.scatter(x, y, color='black')  # show endpoints
+            #ax.plot(x, y, color='red', linewidth=1)
+            #ax.scatter(x, y, color='green')  # show endpoints
             
 
             dist = np.linalg.norm(outer_pt - inner_pt)
-            
-            if dist > best_dist:
-                best_dist = dist
-                best_outer = outer_pt
-                best_inner = inner_pt
-        #ax.set_aspect('equal')
-        #plt.xlabel("X [m]")
-        #plt.ylabel("Y [m]")
-        #plt.show()
 
-    if best_outer is None or best_inner is None:
-        return np.nan, None, None
+            if dist/dt > 10: continue
+            
+            best_dist.append( dist )
+            best_outer.append(outer_pt )
+            best_inner.append(inner_pt )
+    
+    #ax.set_aspect('equal')
+    #plt.xlabel("X [m]")
+    #plt.ylabel("Y [m]")
+    #plt.show()
+    #pdb.set_trace()
+    #if best_outer is None or best_inner is None:
+    #    return np.nan, None, None
 
     return best_dist, best_outer, best_inner
 
@@ -167,6 +235,16 @@ def compute_polygon_velocity(gdf):
     gdf = gdf.explode(ignore_index=True)
     gdf["component_id"] = gdf.groupby("source_id").cumcount()
 
+    #global ax
+    #ax =plt.subplot(111)
+    gdfc = gdf.copy()
+    gdf['geometry'] = gdf['geometry'].apply(densify_geometry)
+   
+    #gdfc.plot(facecolor='none', edgecolor='k',ax=ax)
+    ##gdf.plot(facecolor='none', edgecolor='r', ax=ax)
+    #plt.show()
+    #pdb.set_trace()
+
     # Ensure projected CRS for distance calculations
     if gdf.crs is None or gdf.crs.is_geographic:
         raise ValueError("GeoDataFrame must have a projected CRS (units in meters).")
@@ -179,7 +257,7 @@ def compute_polygon_velocity(gdf):
             continue
 
         for j, row_j in gdf.iloc[i + 1:].iterrows():
-            print(j)
+            #print(j)
             inner = row_j.geometry
             if not isinstance(inner, Polygon) : #or inner.is_empty:
                 continue
@@ -191,52 +269,60 @@ def compute_polygon_velocity(gdf):
                 ax.set_aspect('equal')
                 plt.show()
                 pdb.set_trace()
+            
             # Test containment
             if not outer.is_valid or not inner.is_valid:
                 continue
             if not outer.contains(inner):
                 continue
-
-
-            # Compute maximum vertex distance
-            obstacle_geoms = gdf.geometry.tolist()
-            max_dist, outer_pt, inner_pt = compute_max_distance(outer, inner, obstacle_geoms)
-            print(max_dist)
-            if max_dist is None or np.isnan(max_dist):
-                continue
-
+            
             # Time difference in hours
             t1, t2 = row_i.timestamp,  row_j.timestamp
             dt_hours = (t1 - t2).total_seconds() 
             if dt_hours <= 0:
                 continue
 
-            velocity = max_dist / dt_hours  # meters/hour
-            dx = inner_pt[0] - outer_pt[0]
-            dy = inner_pt[1] - outer_pt[1]
-            vector_line = LineString([(outer_pt[0], outer_pt[1]), (inner_pt[0], inner_pt[1])])
+            # Compute maximum vertex distance
+            obstacle_geoms = gdf.geometry.tolist()
+            max_dist, outer_pt, inner_pt = compute_max_distance(outer, inner, dt_hours, obstacle_geoms )
+           
+           
+            velocity = []
+            vector_line = []
+            for max_dist_, outer_pt_, inner_pt_ in zip(max_dist, outer_pt, inner_pt):
+                
+                if max_dist_ is None or np.isnan(max_dist_):
+                    continue
+
+                velocity.append( max_dist_ / dt_hours )  # meters/hour
+                dx = inner_pt_[0] - outer_pt_[0]
+                dy = inner_pt_[1] - outer_pt_[1]
+                vector_line.append( LineString([(outer_pt_[0], outer_pt_[1]), (inner_pt_[0], inner_pt_[1])]) )
+
+            velocity_out    = np.array(velocity).mean()
+            velocity_std_out    = np.array(velocity).std()
+            vector_line_out = mean_vector_line(vector_line)
+            if velocity_out > 10: 
+                pdb.set_trace()
 
             results.append({
-                "outer_id": int(row_i.source_id),
-                "inner_id": int(row_j.source_id),
-                "outer_component": int(row_i.component_id),
-                "inner_component": int(row_j.component_id),
                 "outer_time": t1,
                 "inner_time": t2,
-                "max_dist_m": max_dist,
-                "velocity_m_per_s": velocity,
-                "vector_dx": dx,
-                "vector_dy": dy,
-                "outer_pt_x": outer_pt[0],
-                "outer_pt_y": outer_pt[1],
-                "inner_pt_x": inner_pt[0],
-                "inner_pt_y": inner_pt[1],
-                "geometry": vector_line,
+                "velocity_m_per_s": velocity_out,
+                "velocity_m_per_s_std": velocity_std_out,
+                "outer_pt_x": vector_line_out.coords[-1][0],
+                "outer_pt_y": vector_line_out.coords[-1][1],
+                "inner_pt_x": vector_line_out.coords[0][0],
+                "inner_pt_y": vector_line_out.coords[0][1],
+                "geometry": vector_line_out,
             })
+            
+    #print( results[-1]['velocity_m_per_s'])
 
-            break
-
-    gdf_results = gpd.GeoDataFrame(results, geometry='geometry', crs=gdf.crs)
+    if len( results ) > 0:
+        gdf_results = gpd.GeoDataFrame(results, geometry='geometry', crs=gdf.crs)
+    else: 
+        gdf_results = gpd.GeoDataFrame(results)
 
     return gdf_results
 

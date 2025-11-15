@@ -83,10 +83,17 @@ med = [
     ['Spain', 'ES', None],
     ['Switzerland', 'CH', None],
     ['Turkey', 'TR', None],
+    ['gcc states', 'SAU', None],
+    ['Russia', 'RUS', None],
+    ['Moldova', 'MDA', None],
+    ['Ukraine', 'UKR', None],
+    ['Kosovo',      None, None],	
+    ['Montenegro', 	None, None],
+
 ]
 
 # Potential regions on the Geofabrik server
-continents = ["europe", "asia", "africa"]
+continents = ["europe", "asia", "africa", ""]
 
 # Directory to save files
 os.makedirs("osm_data", exist_ok=True)

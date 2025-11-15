@@ -29,7 +29,7 @@ if __name__ == '__main__':
     #continent = 'asia'
     
     dir_data = '/data/shared/'
-    dir_out_root = '/data/paugam/OSM_IndustrialZone/'
+    dir_out_root = '/data/shared/OSM_IndustrialZone/'
 
     importlib.reload(tools)
     
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     #industrial zon
     indir = '{:s}/{:s}/'.format(dir_out_root,continent)
     indusFiles = sorted(glob.glob(indir+'*.geojson'))
-
+    
     dirout = '{:s}/'.format(dir_out_root)
     tools.ensure_dir(dirout)
 

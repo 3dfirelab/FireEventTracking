@@ -194,6 +194,15 @@ asia = [
 
 
 europe=[
+        ['Tunisia', 'TUN', None],
+        ['Syria', 'SYR', None],
+        ['Lebanon', 'LBN', None],
+        ['Jordan', 'JOR', None],
+        ['Israel and Palestine', 'IS1', None],
+        ['Egypt', 'EGY', None],
+        ['Morocco', 'MAR,SAH', None],
+        ['Algeria', 'DZA', None],
+        ['Libya', 'LBY', None],
         ['Albania', 'AL', None],	
         ['Andorra', None, None], 	
         ['Azores', 'PT', 'PT2'], 	
@@ -239,7 +248,11 @@ europe=[
         ['Sweden', 	'SE', None],
         ['Switzerland', 'CH', None],
         ['Turkey', 	'TR', None],
-    ] 
+        ['gcc states', 'SAU', None],
+        ['Russia', 'RUS', None],
+        ['Moldova', 'MDA', None],
+        ['Ukraine', 'UKR', None],
+        ] 
 
 
 
@@ -290,6 +303,12 @@ med=[
         ['Spain', 	'ESP', None],
         ['Switzerland', 'CHE', None],
         ['Turkey', 	'TUR', None],
-    ] 
+        ['Saudi Arabia', 'SAU', None],
+        ['Russia', 'RUS', None],
+        ['Moldava', 'MDA', None],
+        ['Ukraine', 'UKR', None],
+        ['Kosovo',      'KOS', None],	
+        ['Montenegro', 	'MNE', None],
+        ] 
 
 

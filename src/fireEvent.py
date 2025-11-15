@@ -25,6 +25,8 @@ import rioxarray
 import rasterio
 from rasterio.features import rasterize
 import xarray as xr
+from shapely.geometry import Polygon, LineString
+import getFROS
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
 
@@ -34,6 +36,7 @@ import ros as ROSlib
 
 importlib.reload(interpArrivalTime)
 importlib.reload(ROSlib)
+importlib.reload(getFROS)
 
 #########################
 def getCloudMask(params, target_time, polygon):
@@ -111,6 +114,9 @@ class Event:
         #    plt.show()
 
         self.id_fire_event_dad = []
+    
+        self.fros = [-999]
+        self.fros_v = [None]
 
         #self.cloudMask = getCloudMask(params, self.times[-1], self.ctrs.iloc[-1])
 
@@ -140,7 +146,34 @@ class Event:
         self.hspots.at[self.hspots.index[-1], 'frp'] = hsfrps
       
         self.areas = self.ctrs.geometry.area.to_list()
+    
+        if len(self.ctrs) >= 2:
+            last_two = self.ctrs.tail(2).copy()
+            last_two['timestamp']=self.times[-2:]
+            if all(last_two.geometry.apply(lambda g: isinstance(g, Polygon))):
+                if last_two.geometry.iloc[-2].equals( last_two.geometry.iloc[-1]): 
+                    self.fros.append(0.0)
+                    self.fros_v.append( None )
+                else:
+                    try:
+                        fros_data = getFROS.compute_polygon_velocity(last_two[::-1])
+                    except: 
+                        pdb.set_trace()
+               
+                    if len(fros_data) !=0: 
+                        self.fros.append(fros_data.velocity_m_per_s[0])
+                        coords = [(fros_data.inner_pt_x[0], fros_data.inner_pt_y[0]), 
+                                  (fros_data.outer_pt_x[0], fros_data.outer_pt_y[0])]
+                        self.fros_v.append( LineString(coords) )
+                    else: 
+                        self.fros.append(-999)
+                        self.fros_v.append( None )
 
+            
+        else: 
+            self.fros.append(-999)
+            self.fros_v.append( None ) 
+        
         #if  self.id_fire_event == 10:
         #    ax=plt.subplot(111)
         #    self.ctrs.iloc[-1:].plot(ax=ax,facecolor='none')

@@ -17,7 +17,7 @@ fi
 
 export dataDir=$rootDataDir/FCI/hotspots
 export ctrlDir=$rootDataDir/FCI/log
-export logDir=$rootDataDir/FCI/fire_events/log
+export logDir=$rootDataDir/FCI/MED_fire_events/log
 if [ ! -d "$logDir" ]; then
     mkdir -p "$logDir"
 fi
@@ -32,7 +32,7 @@ if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     rm "$ctrlDir/lock_FireEventTracking.txt"
 
     #to concatenate last 2 days on the website
-    $mambaDir//mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
+    #$mambaDir//mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
 fi
 
 

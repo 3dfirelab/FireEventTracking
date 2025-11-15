@@ -23,7 +23,7 @@ if __name__ == '__main__':
    
     continent = 'med'
     dir_in_data = '/data/shared/OSM/'
-    dir_out = '/data/paugam/OSM_IndustrialZone/'
+    dir_out = '/data/shared/OSM_IndustrialZone/'
     
     importlib.reload(contries_mod)
     from countries import europe, asia, namerica, samerica, camerica, africa, med

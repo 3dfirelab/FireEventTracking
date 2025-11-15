@@ -114,21 +114,29 @@ def create_gdf_fireEvents(params,fireEvents):
     times = []
     centers = []
     frps = []
+    fross = []
+    fross_v = []
     ids = []
     names = []
     ffmnhUrl = []
-    for fe in filtered_fireEvents:
+    for ife, fe in enumerate(filtered_fireEvents):
         last_ctr = fe.ctrs.iloc[-1]
         geometries.append(last_ctr.geometry)
         times.append(fe.times[-1])
         centers.append(fe.centers[-1])
         frps.append(fe.frps[-1])
+        fross.append(fe.fros[-1])
+        fross_v.append(fe.fros_v[-1])
+
         ids.append(fe.id_fire_event)
         names.append(fe.fire_name)
         try:
             ffmnhUrl.append(fe.ffmnhUrl)
         except: 
             ffmnhUrl.append('none')
+        
+        #if fe.id_fire_event == 141: 
+        #    pdb.set_trace()
 
     # Construct GeoDataFrame
     if crs != None:
@@ -136,6 +144,8 @@ def create_gdf_fireEvents(params,fireEvents):
             'time': times,
             'center': centers,
             'frp': frps,
+            'fros': fross,
+            'fros_v': fross_v,
             'id_fire_event': ids,
             'name': names,
             'ffmnhUrl': ffmnhUrl,
@@ -146,6 +156,8 @@ def create_gdf_fireEvents(params,fireEvents):
             'time': times,
             'center': centers,
             'frp': frps,
+            'fros': fross,
+            'fros_v': fross_v,
             'id_fire_event': ids,
             'name': names,
             'ffmnhUrl': ffmnhUrl,
@@ -255,6 +267,10 @@ def init(config_name, sensorName, log_dir=None):
     if 'dir_cloudMask' in params['event'].keys():
         params['event']['dir_cloudMask'] = params['general']['root_data'] + params['event']['dir_cloudMask'].replace('ORIGIN',sensorName)
         os.makedirs(params['event']['dir_cloudMask'],exist_ok=True)
+    if 'dir_hs_log' in params['event'].keys():
+        params['event']['dir_hs_log'] = params['general']['root_data'] + params['event']['dir_hs_log'].replace('ORIGIN',sensorName)
+        os.makedirs(params['event']['dir_hs_log'],exist_ok=True)
+
     
     return params
   
@@ -614,7 +630,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
     #print('init list Events: ', count_not_none(fireEvents), len(pastFireEvents))
     idate = 0
     flag_get_new_hs = False
-    
+   
+    time_arr   = [] 
+    fixHS_arr  = []
+    fireHS_arr = []
     while date_now<end_datetime:
         print(date_now.strftime("%Y-%m-%d_%H%M"), end=' | ')
         
@@ -669,6 +688,11 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         print(f'{n_hs_after_filter:06d} HS  |  ', end ='')
         print(f'- {n_hs_before_filter-n_hs_after_filter:04d} fixHS  |  ', end ='')
         flag_get_new_hs = True
+
+        time_arr.append(date_now)
+        fixHS_arr.append(n_hs_before_filter-n_hs_after_filter)
+        fireHS_arr.append(n_hs_after_filter)
+
 
         if hsgdf_all_raw is None:
             hsgdf_all_raw = hsgdf.copy()
@@ -811,6 +835,10 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         idxs = fireCluster['end_time'] >= np.datetime64(date_now.replace(tzinfo=None))
         fireCluster =  fireCluster[idxs]
         fireCluster_ctr = fireCluster_ctr[idxs]
+
+        #if len(fireEvents)>141:
+        #    print('##########')
+        #    print(len(fireEvents[141].times))
 
         if len(fireEvents) == 0: 
             #if no fire event were initialized, we set all cluster as fire event
@@ -1087,6 +1115,14 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         event.save( 'past', params)
 
 
+    # Create DataFrame with HS log
+    df = pd.DataFrame({
+        "timestamp": time_arr,
+        "HSfire": fireHS_arr,
+        "HSfix": fixHS_arr
+    })
+    #save HS log
+    df.to_csv(f'{params["event"]["dir_hs_log"]}/HS-{start_datetime.strftime("%Y-%m-%d_%H%M")}.csv')
 
     return start_datetime, fireEvents, pastFireEvents
 
@@ -1138,7 +1174,9 @@ def gdf_to_geojson(gdf_activeEvent, params, datetime_, name_):
     gdf_activeEvent['image'] = gdf_activeEvent.index.to_series().apply(
                                                                         lambda x: url_image_root.format( int(x))
                                                                      )
-
+    #if 141 in gdf_activeEvent.index: 
+    #    print('wriete GEOJSON')
+    #    pdb.set_trace()
     gdf_activeEvent.to_file(tmp_path, driver="GeoJSON")
     # Move to mounted share
     dst_path = os.path.join(params['event']['dir_geoJson'], os.path.basename(tmp_path))
@@ -1329,7 +1367,7 @@ def run_fire_tracking(args):
     if 'mask_HS' in params['event']:
         if os.path.isfile(f"{src_dir}/../data_local/{params['event']['mask_HS']}"):
             maskHS_da = xr.open_dataarray(f"{src_dir}/../data_local/{params['event']['mask_HS']}").rio.write_crs("EPSG:4326", inplace=False)
-    else:
+    if maskHS_da is None :
         print(' ')
         print('## WARNING ####################')
         print('no hotspot mask was set in cong file')
@@ -1346,6 +1384,10 @@ def run_fire_tracking(args):
     elif params['general']['sensor'] == 'FCI':
         dt_minutes = 30.
     
+    if 'end_time_hard' in params['event'].keys():
+        if current >= datetime.strptime(params['event']['end_time_hard']  , '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc):
+            sys.exit()
+
     while current <= end:
             
         end_time = current  
