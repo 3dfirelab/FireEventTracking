@@ -39,6 +39,9 @@ import requests
 import json 
 import socket
 import matplotlib.dates as mdates
+import gc 
+import tracemalloc
+tracemalloc.start()
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -319,6 +322,14 @@ def filter_points_by_mask(gdf: gpd.GeoDataFrame, mask_da: xr.DataArray, mask_val
 ####################################################
 def cache_file(params, fireEvents_files, max_workers=16):
     local_dir = tempfile.mkdtemp()
+
+    try: 
+        ntasks = os.environ["SLURM_NTASKS"]
+        cpus_per_task = os.environ["SLURM_CPUS_PER_TASK"]
+        max_workers = ntasks * cpus_per_task
+
+    except: 
+        pass
 
     def copy_to_local(remote_file):
         local_path = os.path.join(local_dir, os.path.basename(remote_file))
@@ -735,7 +746,8 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
             epsilon = 2000  
         hsgdf_all["x"] = hsgdf_all.geometry.x
         hsgdf_all["y"] = hsgdf_all.geometry.y
-        db = DBSCAN(eps=epsilon, min_samples=1, metric='euclidean').fit(np.array(hsgdf_all[['x','y' ]]))
+        db = DBSCAN(eps=epsilon, min_samples=1, metric='euclidean', n_jobs=-1 ).fit(np.array(hsgdf_all[['x','y' ]]))
+        #db = DBSCAN(eps=epsilon, min_samples=1, metric='euclidean').fit(np.array(hsgdf_all[['x','y' ]]))
 
         # Add cluster labels to the GeoDataFrame
         hsgdf_all.loc[:,['cluster']] = db.labels_
@@ -772,12 +784,19 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         ).reset_index()
 
         #compute FRP per cluster using only the last hotspot
+        ''' 
         frp_cluster = []
         for icluster, cluster in fireCluster.iterrows():
             idx_valid_hs = hsgdf_all.loc[fireCluster['indices_hs'][icluster]]['timestamp'] >= np.datetime64(date_now.replace(tzinfo=None))
             frp_ = hsgdf_all.loc[fireCluster['indices_hs'][icluster]].frp[idx_valid_hs].sum()
             frp_cluster.append(frp_)
         fireCluster['frp'] = frp_cluster
+        '''
+        mask_recent = hsgdf_all['timestamp'] >= np.datetime64(date_now.replace(tzinfo=None))
+        frp_recent = hsgdf_all.loc[mask_recent].groupby('cluster_fire_event')['frp'].sum()
+        fireCluster = fireCluster.merge(frp_recent.rename('frp'), on='cluster_fire_event', how='left')
+        fireCluster['frp'] = fireCluster['frp'].fillna(0.0) 
+        
 
         fireCluster.loc[:,['duration']] = (fireCluster['end_time']-fireCluster['start_time']).dt.total_seconds()/(24*3600) 
         fireCluster['center'] = [Point(xx,yy) for xx,yy in zip( fireCluster.x, fireCluster.y ) ]
@@ -1009,6 +1028,8 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         idate+=1
     
         if date_now<end_datetime : print('')
+        gc.collect()
+        
 
     #date_now = date_now - timedelta(minutes=dt_minutes_perimeters)    # subtract one day
     
@@ -1099,7 +1120,16 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         if dir_Pkl is not None:
             os.makedirs(dir_Pkl, exist_ok=True)
             # Parallel copy using multiprocessing
-            with Pool(processes=16) as pool:
+            
+            try: 
+                ntasks = os.environ["SLURM_NTASKS"]
+                cpus_per_task = os.environ["SLURM_CPUS_PER_TASK"]
+                max_workers = ntasks * cpus_per_task
+
+            except: 
+                max_workers = 16 
+            
+            with Pool(processes=max_workers) as pool:
                 pool.map(copy_file, copy_tasks)
 
         # Optional cleanup (uncomment to remove temp dir after copy)
@@ -1109,7 +1139,9 @@ def perimeter_tracking(params, start_datetime, maskHS_da, dt_minutes):
         if flag_PastFireEvent:
             print('  FireEvents saved: active: {:6d}  past: {:6d}'.format(count_not_none(fireEvents), len(pastFireEvents)))
         else:
-            print('  FireEvents saved: active: {:6d} '.format(count_not_none(fireEvents), ))
+            print('  FireEvents saved: active: {:6d} '.format(count_not_none(fireEvents), ), end='  #  ')
+            cur, peak = tracemalloc.get_traced_memory()
+            print(f"[MEM] current={cur/1e9:.2f} GB peak={peak/1e9:.2f} GB - hsgdf_all_raw len={len(hsgdf_all_raw)}")
 
     for id_, event in enumerate(pastFireEvents):
         event.save( 'past', params)
@@ -1365,8 +1397,11 @@ def run_fire_tracking(args):
     
     maskHS_da = None
     if 'mask_HS' in params['event']:
-        if os.path.isfile(f"{src_dir}/../data_local/{params['event']['mask_HS']}"):
-            maskHS_da = xr.open_dataarray(f"{src_dir}/../data_local/{params['event']['mask_HS']}").rio.write_crs("EPSG:4326", inplace=False)
+        #if os.path.isfile(f"{src_dir}/../data_local/{params['event']['mask_HS']}"):
+        #    maskHS_da = xr.open_dataarray(f"{src_dir}/../data_local/{params['event']['mask_HS']}").rio.write_crs("EPSG:4326", inplace=False)
+        if os.path.isfile(f"{params['event']['mask_HS']}"):
+            maskHS_da = xr.open_dataset(f"{params['event']['mask_HS']}").rio.write_crs("EPSG:4326", inplace=False)['mask']
+    
     if maskHS_da is None :
         print(' ')
         print('## WARNING ####################')
@@ -1375,6 +1410,7 @@ def run_fire_tracking(args):
         print('and set it in conf/event')
         print('## WARNING ####################')
         print(' ')
+        sys.exit()
 
     # Loop hourly
     current = start
@@ -1386,6 +1422,7 @@ def run_fire_tracking(args):
     
     if 'end_time_hard' in params['event'].keys():
         if current >= datetime.strptime(params['event']['end_time_hard']  , '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc):
+            open(f"{log_dir}/reach_end_time_hard.txt", "w").close() 
             sys.exit()
 
     while current <= end:
@@ -1423,8 +1460,8 @@ if __name__ == '__main__':
     domain: -10,35,20,46
     '''
     print('FET start!')
-    importlib.reload(hstools)
-    importlib.reload(fireEvent)
+    #importlib.reload(hstools)
+    #importlib.reload(fireEvent)
     src_dir = os.path.dirname(os.path.abspath(__file__))
   
     parser = argparse.ArgumentParser(description="fireEventTracking")
@@ -1437,6 +1474,8 @@ if __name__ == '__main__':
     run_fire_tracking(args)
 
     print('FET done!')
+    sys.exit()
+
     '''
     import cProfile
     import pstats

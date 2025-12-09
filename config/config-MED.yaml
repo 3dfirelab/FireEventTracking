@@ -15,7 +15,7 @@ event:
   dir_cloudMask: ORIGIN/RASTER/cloudMask/
   start_time: '2025-01-01_0000'
   end_time_hard: '2025-10-15_0000'
-  mask_HS: mask_hs_600m_med.nc
+  mask_HS: /data/shared/HSDensity_VIIRS2025/hs_density_mask_med.nc
   eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
   cloudMask_mtg: "FCI/RASTER/cloudMask/"
   dir_hs_log: "ORIGIN/MED_fire_events/HS_log/"

@@ -22,17 +22,34 @@ if [ ! -d "$logDir" ]; then
     mkdir -p "$logDir"
 fi
 
+
+# --- Argument handling ---
+if [ "$1" = "log_dir" ]; then
+    echo "$logDir"
+    exit 0
+
+elif [ "$1" != "run" ]; then
+    echo "Usage: $0 {log_dir|run}"
+    exit 1
+fi
+
+echo "run FET"
+
 #if [ -f "$ctrlDir/runFireEvent.txt" ] && [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
 if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     touch "$ctrlDir/lock_FireEventTracking.txt"
 
-    $mambaDir/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName MED --sensorName FCI --log_dir $logDir >& $logDir/fireEventTracking.log
+    $mambaDir/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName MED --sensorName FCI --log_dir $logDir #>& $logDir/fireEventTracking.log
+
+    echo 'fireEventTracking.py done'
 
     #rm "$ctrlDir/runFireEvent.txt"
     rm "$ctrlDir/lock_FireEventTracking.txt"
 
     #to concatenate last 2 days on the website
     #$mambaDir//mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
+else
+    echo "found lock_FireEventTracking.txt "
 fi
 
 
