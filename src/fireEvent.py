@@ -146,6 +146,9 @@ class Event:
         self.hspots.at[self.hspots.index[-1], 'frp'] = hsfrps
       
         self.areas = self.ctrs.geometry.area.to_list()
+        
+        if len(self.fros) != len(self.frps)-1 :
+            pdb.set_trace()
     
         if len(self.ctrs) >= 2:
             last_two = self.ctrs.tail(2).copy()
@@ -155,10 +158,7 @@ class Event:
                     self.fros.append(0.0)
                     self.fros_v.append( None )
                 else:
-                    try:
-                        fros_data = getFROS.compute_polygon_velocity(last_two[::-1])
-                    except: 
-                        pdb.set_trace()
+                    fros_data = getFROS.compute_polygon_velocity(last_two[::-1])
                
                     if len(fros_data) !=0: 
                         self.fros.append(fros_data.velocity_m_per_s[0])
@@ -168,12 +168,18 @@ class Event:
                     else: 
                         self.fros.append(-999)
                         self.fros_v.append( None )
+            else: 
+                self.fros.append(-999)
+                self.fros_v.append( None ) 
 
             
         else: 
             self.fros.append(-999)
             self.fros_v.append( None ) 
-        
+       
+        if len(self.fros) != len(self.frps):
+            pdb.set_trace()
+
         #if  self.id_fire_event == 10:
         #    ax=plt.subplot(111)
         #    self.ctrs.iloc[-1:].plot(ax=ax,facecolor='none')
@@ -214,6 +220,9 @@ class Event:
         self.ctrs = pd.concat([self.ctrs, event.ctrs]).reset_index(drop=True)
         self.hspots = pd.concat([self.hspots, event.hspots]).reset_index(drop=True)
         
+        [self.fros.append(fros_) for fros_ in event.fros]
+        [self.fros_v.append(fros_v_) for fros_v_ in event.fros_v]
+        
         #reorder in time sequence
         sorted_indices = np.argsort(self.times)
         
@@ -225,6 +234,9 @@ class Event:
         self.indices_hs = [self.indices_hs[ii] for ii in sorted_indices ]
         self.ctrs = self.ctrs.iloc[sorted_indices].reset_index(drop=True)
         self.hspots = self.hspots.iloc[sorted_indices].reset_index(drop=True)
+        
+        self.fros = [self.fros[ii] for ii in sorted_indices ]
+        self.fros_v = [self.fros_v[ii] for ii in sorted_indices ]
 
     def mergeWith(self, idx_dad):
         for i in idx_dad:

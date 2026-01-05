@@ -95,18 +95,26 @@ def plot(params, year, week, fireEvents, pastFireEvents, flag_plot_hs=True, flag
             if row_ctr.geometry.geom_type == 'Point':
                 if flag_remove_singleHs: 
                     if len(event.times) == 1: continue
-                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).plot(ax=ax, color=colors[irow], linewidth=0.1, zorder=2, alpha=0.7, markersize=1)
+                #gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).plot(ax=ax, color=colors[irow], linewidth=0.1, zorder=2, alpha=0.7, markersize=1)
+                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, color='k', linewidth=0.1, zorder=2, alpha=0.7, markersize=1)
+                print('point')
             else:
                 gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor=colors[irow], cmap=cmap, linewidth=1, zorder=2, alpha=0.7)
+            
             if flag_plot_hs:
                 points = gpd.GeoSeries([row_hs.geometry]).explode(index_parts=False).set_crs(params['general']['crs'])
                 if len(points)>0:
                     points.to_crs(4326).plot(ax=ax, color=colors[irow], alpha=0.5, markersize=40)
     
     for event in pastFireEvents:
-        if flag_remove_singleHs: 
-            if len(event.times) == 1: continue
-        event.ctrs.set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor='r', alpha=0.9, linewidth=0.1, linestyle='--', zorder=1, markersize=1)
+        for (irow,row_ctr), (_,row_hs) in zip(event.ctrs.iterrows(),event.hspots.iterrows()):
+            #if flag_remove_singleHs: 
+            #    if len(event.times) == 1: continue
+     
+            if row_ctr.geometry.geom_type != 'Polygon':
+                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, color='r', alpha=0.9, linewidth=0.1, zorder=1, markersize=1)
+            else: 
+                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor='r', alpha=0.9, linewidth=0.1 , zorder=1, markersize=1)
 
     ax.set_title(f'{year} - week{week}' )
 
@@ -125,7 +133,7 @@ def plot(params, year, week, fireEvents, pastFireEvents, flag_plot_hs=True, flag
     filename = "{:s}/Stats/fireEvent-{:s}-{:d}-{:02d}.png".format(params['event']['dir_data'],params['general']['domainName'],year,week) 
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     
-    fig.savefig(filename,dpi=200)
+    fig.savefig(filename,dpi=400)
     plt.close(fig)
     
     #plt.show()
@@ -135,7 +143,7 @@ def plot(params, year, week, fireEvents, pastFireEvents, flag_plot_hs=True, flag
 def run_fire_stats(args):
     inputName = args.inputName
     sensorName = args.sensorName
-    log_dir = args.log_dir
+    #log_dir = args.log_dir
    
     #log_dir = sys.argv[2]
     #inputName = sys.argv[1]
@@ -163,22 +171,23 @@ def run_fire_stats(args):
     
     elif ('MED' in inputName ): 
         params = fet.init(inputName,sensorName) 
-        if os.path.isfile(log_dir+'/timeControl.txt'): 
-            with open(log_dir+'/timeControl.txt','r') as f:
-                start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+        if False: 
+            print('*************************************')
+            print('************** set start and end time')
+            print('*************************************')
+            start = datetime.strptime('2025-02-01_0000', '%Y-%m-%d_%H%M' ) # params['general']['time_start'], '%Y-%m-%d_%H%M')
+            end = datetime.strptime(  '2025-03-31_2350', '%Y-%m-%d_%H%M') #params['general']['time_end'], '%Y-%m-%d_%H%M')
+            print(start)
+            print(end)
+            
         else:
+
+            #if os.path.isfile(log_dir+'/timeControl.txt'): 
+            #    with open(log_dir+'/timeControl.txt','r') as f:
+            #        start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
+            #else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
-   
-        if 'end_time' in params['event']: 
-            end = datetime.strptime(params['event']['end_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
-        else:
-            end = start + timedelta(days=1) #20 minute of MTG latence.
-            # Round down to the nearest xx:00 or xx:30
-            end = end.replace(second=0, microsecond=0)
-            if end.minute < 30:
-                end = end.replace(minute=0)
-            else:
-                end = end.replace(minute=30) 
+            end   = datetime.strptime(params['event']['end_time_hard'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
 
     elif ('SILEX' in inputName) or ('PORTUGAL' in inputName)  or ('MED' in inputName ): 
         params = fet.init(inputName,sensorName) 
@@ -215,10 +224,10 @@ def run_fire_stats(args):
     start = start.replace(tzinfo=timezone.utc)
     end   = end.replace(tzinfo=timezone.utc) #- timedelta(hours=1)
 
-    #print('########times#########')
-    #print(start)
-    #print(end)
-    #print('######################')
+    print('########times#########')
+    print(start)
+    print(end)
+    print('######################')
    
     if start == end: 
         print('end == start: stop here')
@@ -239,6 +248,7 @@ def run_fire_stats(args):
 
     root = Path(params['event']['dir_data'])
     os.makedirs(params['event']['dir_data']+'Stats/', exist_ok=True)
+    os.makedirs(f"{params['event']['dir_data']}/FRP-FROS/", exist_ok=True)
 
     # regex to extract datetime from directory name
     pattern = re.compile(r"Pickles_active_(\d{4}-\d{2}-\d{2}_\d{4})")
@@ -255,9 +265,12 @@ def run_fire_stats(args):
         for pkl in dir_.glob("*.pkl"):
             fire_id = pkl.stem  # basename without .pkl
             records.append((fire_id, pkl, dt))
-
+    
     df = pd.DataFrame(records, columns=["fire_id", "file", "datetime"])
     df['fire_id'] = df['fire_id'].astype(int)
+    
+    df["datetime"] = pd.to_datetime(df["datetime"]).dt.tz_localize("UTC")
+    df = df[ (df["datetime"]>=start) & (df["datetime"]<=end) ]
 
     # keep only the last file per fire_id (latest datetime)
     df_sorted = df.sort_values(by=["fire_id", "datetime"])
@@ -265,6 +278,7 @@ def run_fire_stats(args):
 
     # final dataframe with filename and date
     df_final = df_latest[["file", "datetime","fire_id"]].copy()
+
 
     # assign ISO week + year (avoid collisions across years)
     df_final["year"] = df_final["datetime"].dt.isocalendar().year
@@ -276,6 +290,7 @@ def run_fire_stats(args):
 
     data_per_week = []
     data_per_week_all = []
+    gdf_events_all = None
     for (year, week,), df_week in grouped:
         print(f"Processing YEAR={year}, WEEK={week}, N={len(df_week)}")
 
@@ -292,8 +307,20 @@ def run_fire_stats(args):
 
             event = fireEvent.load_fireEvent(event_file)
             weekEvents.append( event ) 
-            
-            if fire_id == 141: 
+           
+            #saved FRP and FROS time series for each event in FRP_FROS dir
+            if len(event.fros) == len(event.frps) : 
+                    dfts = pd.DataFrame({'timestamp':event.times, 'frp':event.frps, 'fros':event.fros})
+                    dfts["timestamp"] = pd.to_datetime(dfts["timestamp"], utc=True)
+                    dfts[["timestamp", "frp", "fros"]].to_json(
+                                              f"{params['event']['dir_data']}/FRP-FROS/{fire_id:09d}.json",
+                                                orient="records",
+                                                date_format="iso"
+                                              )
+            else:
+                print(f"{fire_id:09d} len fros != frp {len(event.fros)}  {len(event.frps)}")
+
+            if False: #fire_id == 141: 
                 fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
                 ax=axes[0]
                 ax.plot(event.times, event.frps)
@@ -342,7 +369,23 @@ def run_fire_stats(args):
         data_per_week_all.append([weekArea_arr, weekDuration_arr])
 
         plot(params, year, week, [], weekEvents, flag_plot_hs=False, flag_remove_singleHs=True)
-    
+   
+        for event in weekEvents:
+            gdf_ = gpd.GeoDataFrame(
+                    {
+                        "frp": event.frps,
+                        "timestamp": pd.to_datetime(event.times),
+                        "fire_event_id": [event.id_fire_event]*len(event.frps)
+                    },
+                    geometry=event.ctrs['geometry'],
+                    crs=event.ctrs.crs    
+                )
+            
+            if gdf_events_all is None:
+                gdf_events_all = gdf_
+            else:
+                gdf_events_all = pd.concat([gdf_, gdf_events_all])
+
 
     df_weekly = pd.DataFrame(
                                 data_per_week,
@@ -361,6 +404,9 @@ def run_fire_stats(args):
     df_weekly.to_csv("{:s}/Stats/{:s}-weekly.csv".format(params['event']['dir_data'],params['general']['domainName']))
     with open("{:s}/Stats/{:s}-area_duration_weekly_allData.pkl".format(params['event']['dir_data'],params['general']['domainName']), "wb") as f:
         pickle.dump(data_per_week_all, f) 
+    
+    gdf_events_all.to_file("{:s}/Stats/{:s}-gdf_{:s}_{:s}.geojson".format(
+                            params['event']['dir_data'],params['general']['domainName'], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")), driver="GeoJSON")
 
     return df_weekly
 
@@ -380,7 +426,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="fireEventTracking")
     parser.add_argument("--inputName", type=str, help="name of the configuration input", )
     parser.add_argument("--sensorName", type=str, help="name of the sensor, VIIRS or FCI", )
-    parser.add_argument("--log_dir", type=str, help="Directory for logs", default='/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/')
+    #parser.add_argument("--log_dir", type=str, help="Directory for logs", default='/mnt/dataEstrella2/SILEX/VIIRS-HotSpot/FireEvents/log/')
 
     args = parser.parse_args()
 

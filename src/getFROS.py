@@ -299,6 +299,8 @@ def compute_polygon_velocity(gdf):
                 dy = inner_pt_[1] - outer_pt_[1]
                 vector_line.append( LineString([(outer_pt_[0], outer_pt_[1]), (inner_pt_[0], inner_pt_[1])]) )
 
+            if len(velocity) == 0 : continue
+
             velocity_out    = np.array(velocity).mean()
             velocity_std_out    = np.array(velocity).std()
             vector_line_out = mean_vector_line(vector_line)

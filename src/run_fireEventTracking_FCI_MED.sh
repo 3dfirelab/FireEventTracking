@@ -40,8 +40,14 @@ if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     touch "$ctrlDir/lock_FireEventTracking.txt"
 
     $mambaDir/mamba run -n tracking python $srcDir/fireEventTracking.py --inputName MED --sensorName FCI --log_dir $logDir #>& $logDir/fireEventTracking.log
-
+    status_python=$?
+    
     echo 'fireEventTracking.py done'
+
+
+    if [ $status_python -ne 0 ]; then
+        exit 1
+    fi
 
     #rm "$ctrlDir/runFireEvent.txt"
     rm "$ctrlDir/lock_FireEventTracking.txt"
@@ -50,6 +56,7 @@ if [ ! -e "$ctrlDir/lock_FireEventTracking.txt" ]; then
     #$mambaDir//mamba run -n tracking python $srcDir/fireEventTracking_updateWebSite.py
 else
     echo "found lock_FireEventTracking.txt "
+    exit 1
 fi
 
 

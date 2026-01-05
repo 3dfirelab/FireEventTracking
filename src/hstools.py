@@ -91,12 +91,12 @@ def load_hs4lastObsAllSat(day,hour,params):
         if len(hsfiles)==1: 
             try:
                 df_ = pd.read_csv(hsfiles[0], delimiter=',', header=0)
-                df_ = df_.dropna()
+                df_ = df_.dropna( subset=["ACQTIME", "FRP", "LONGITUDE", "LATITUDE"] )
             except EmptyDataError: 
                 continue
             if len(df_) == 0 : continue
             if df is None: 
-                df = df_
+                df = df_.copy()
             else:
                 df = pd.concat([df,df_])
         
@@ -135,7 +135,7 @@ def load_hs4lastObsAllSat(day,hour,params):
 
         # Create the empty DataFrame
         return  pd.DataFrame(columns=columns)
-    
+
     try:
         if params['general']['sensor'] == 'FCI':
             df.rename(columns={'LONGITUDE': 'longitude'}, inplace=True)
@@ -151,13 +151,17 @@ def load_hs4lastObsAllSat(day,hour,params):
 
     # Create GeoDataFrame
     gdf = gpd.GeoDataFrame(df, geometry=geometry)
-    gdf.set_crs(epsg=4326, inplace=True)
+    gdf = gdf.set_crs(epsg=4326)
     
     if params['general']['sensor'] == 'FCI':
         #apply clip to domain
         bbox_geom = box(*[float(xx) for xx in params["general"]["domain"].split(',')])
         bbox_gdf  = gpd.GeoDataFrame(geometry=[bbox_geom], crs="4326")
         gdf = gpd.clip(gdf, bbox_gdf).reset_index(drop=True)
+        #ax = plt.subplot(111)
+        #gdf.plot(ax=ax)
+        #bbox_gdf.plot(ax=ax, edgecolor='k', facecolor='none')
+        #plt.show()
 
     
     # Combine and convert to datetime
@@ -186,7 +190,8 @@ def load_hs4lastObsAllSat(day,hour,params):
         #    pdb.set_trace()
         #    gdf["timestamp"] = pd.to_datetime(gdf['ACQTIME'].astype(str), format='%Y%m%d%H%M%S')
 
-    
+
+    #if len(gdf) == 0 : pdb.set_trace()
     return gdf.to_crs(params['general']['crs']).reset_index(drop=True)
 
 

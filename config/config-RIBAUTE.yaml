@@ -1,7 +1,7 @@
 # config.yaml
 general:
-  domain: -10,35,20,52
-  domainName: 'SILEX-ribaute'
+  domain: 2.2,42.7,3.2,43.5
+  domainName: 'RIBAUTE'
   crs: 3035
   use_sedoo_drive: False 
   root_data: /data/shared/
@@ -9,16 +9,16 @@ hs:
   dir_data: ORIGIN/hotspots2025
   sats: ['']
 event:
-  dir_data: ORIGIN/SILEX-ribaute-fire_events 
-  dir_geoJson: ORIGIN/SILEX-ribaute-fire_events/GeoJson
-  dir_frp: ORIGIN/SILEX-ribaute-fire_events/FRP
+  dir_data: ORIGIN/RIBAUTE-fire_events 
+  dir_geoJson: ORIGIN/RIBAUTE-fire_events/GeoJson
+  dir_frp: ORIGIN/RIBAUTE-fire_events/FRP
   dir_cloudMask: ORIGIN/RASTER/cloudMask/
   start_time: '2025-08-05_1400'
   end_time: '2025-08-06_1200'
   mask_HS: /data/shared/HSDensity_VIIRS2025/hs_density_mask_med.nc
   eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
   cloudMask_mtg: "FCI/RASTER/cloudMask/"
-  dir_hs_log: "ORIGIN/SILEX-ribaute-fire_events/HS_log/"
+  dir_hs_log: "ORIGIN/RIBAUTE-fire_events/HS_log/"
 postproc:
   dir_FWI:  AROME/FWI
   dir_WIND: AROME/FORECAST/WIND/
