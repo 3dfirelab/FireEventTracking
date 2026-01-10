@@ -4,7 +4,7 @@ general:
   domainName: 'MED'
   crs: 3035
   use_sedoo_drive: False 
-  root_data: /data/shared/
+  root_data: /media/paugam/gast/
 hs:
   dir_data: ORIGIN/hotspots2025
   sats: ['']
@@ -13,9 +13,9 @@ event:
   dir_geoJson: ORIGIN/MED_fire_events/GeoJson
   dir_frp: ORIGIN/MED_fire_events/FRP
   dir_cloudMask: ORIGIN/RASTER/cloudMask/
-  start_time: '2025-01-01_0000'
-  end_time_hard: '2025-12-31_2350'
-  mask_HS: /data/shared/HSDensity_VIIRS2025/data_mask_buffer_3857.geojson
+  start_time: '2025-08-03_0000'
+  end_time_hard: '2025-08-15_2350'
+  mask_HS: /media/paugam/gast/HSDensity_VIIRS2025/data_mask_buffer_3857.geojson
   eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
   cloudMask_mtg: "FCI/RASTER/cloudMask/"
   dir_hs_log: "ORIGIN/MED_fire_events/HS_log/"

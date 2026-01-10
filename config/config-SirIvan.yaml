@@ -1,0 +1,22 @@
+# config.yaml
+general:
+  domain: 140,-42,160,-22
+  domainName: 'SirIvan'
+  crs: 9473
+  use_sedoo_drive: False 
+  root_data: /home/paugam/Data/2017_SirIvan/
+hs:
+  dir_data: ORIGIN/hotspots
+  sats: ['']
+event:
+  dir_data: ORIGIN/2017_SirIvan-fire_events 
+  dir_geoJson: ORIGIN/2017_SirIvan-fire_events/GeoJson
+  dir_frp: ORIGIN/2017_SirIvan-fire_events/FRP
+  dir_cloudMask: ORIGIN/RASTER/cloudMask/
+  start_time: '2017-02-11_0000'
+  end_time: '2017-02-12_2350'
+    #mask_HS: mask_hs_600m_med.nc
+    #eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
+    #cloudMask_mtg: "FCI/RASTER/cloudMask/"
+  dir_hs_log: "ORIGIN/2017_SirIvan-fire_events/HS_log/"
+

@@ -296,6 +296,7 @@ def run_fire_stats(args):
 
         # inner loop: iterate pkl files within the week
         weekEvents = []
+        weekEvents_files = []
         weekFRP = 0
         weekNbreFire = 0 
         weekArea_arr = []
@@ -307,6 +308,7 @@ def run_fire_stats(args):
 
             event = fireEvent.load_fireEvent(event_file)
             weekEvents.append( event ) 
+            weekEvents_files.append(event_file)
            
             #saved FRP and FROS time series for each event in FRP_FROS dir
             if len(event.fros) == len(event.frps) : 
@@ -370,15 +372,26 @@ def run_fire_stats(args):
 
         plot(params, year, week, [], weekEvents, flag_plot_hs=False, flag_remove_singleHs=True)
    
-        for event in weekEvents:
+        for event,event_file in zip(weekEvents,weekEvents_files):
+            
+            frp_ = np.array(event.frps)              # MW
+            t_ = pd.to_datetime(event.times)
+            t_sec = (t_ - t_[0]).total_seconds().values
+            fre_ = np.trapezoid(frp_, t_sec)
+           
             gdf_ = gpd.GeoDataFrame(
                     {
-                        "frp": event.frps,
-                        "timestamp": pd.to_datetime(event.times),
-                        "fire_event_id": [event.id_fire_event]*len(event.frps)
+                        "center_igni":event.centers[0], 
+                        "time_start": pd.to_datetime(event.times[0]),
+                        "time_end": pd.to_datetime(event.times[-1]),
+                        "fre": fre_,
+                        "fire_event_id": event.id_fire_event,
+                        "fire_name": event.fire_name,
+                        "file": event_file
                     },
-                    geometry=event.ctrs['geometry'],
-                    crs=event.ctrs.crs    
+                    geometry=[event.ctrs['geometry'].iloc[-1]],
+                    crs=event.ctrs.crs, 
+                    index=[0],
                 )
             
             if gdf_events_all is None:

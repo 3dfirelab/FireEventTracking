@@ -41,9 +41,13 @@ import socket
 import matplotlib.dates as mdates
 import gc 
 import tracemalloc
+import time
+import cProfile
+import pstats
+import io
+
 
 # start tracking
-
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
 #home brewed
@@ -52,6 +56,8 @@ import fireEvent
 import os
 import subprocess
 import discordMessage
+import hs_clustering
+
 
 #########################################
 def mount_sftp_with_sshfs(mount_point):
@@ -698,7 +704,9 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
             #    hsgdf_all_raw = hsgdf_all_raw.drop(index=19604)
             #except: 
             #    pass
-        
+      
+        #clean hsgdf_all_raw 
+        hsgdf_all_raw = hsgdf_all_raw.drop_duplicates(subset=["latitude", "longitude"],keep='first')
 
         hsgdf_all = hsgdf_all_raw.copy()
         # Use DBSCAN for spatial clustering (define 1000 meters as the spatial threshold)
@@ -713,9 +721,26 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
         hsgdf_all["x"] = hsgdf_all.geometry.x
         hsgdf_all["y"] = hsgdf_all.geometry.y
         
+        #t0 = time.perf_counter()
+        #print ('dbscan')
         db = DBSCAN(eps=epsilon, min_samples=1, metric='euclidean', n_jobs=-1 ).fit(np.array(hsgdf_all[['x','y' ]]))
+        #t1 = time.perf_counter()
         #db = DBSCAN(eps=epsilon, min_samples=1, metric='euclidean').fit(np.array(hsgdf_all[['x','y' ]]))
+        #print('')
+        #print('ParallelEpsDBSCAN')
+        #t2 = time.perf_counter()
+        #db1 = hs_clustering.ParallelEpsDBSCAN(
+        #                                        eps=epsilon,
+        #                                        n_jobs=-1,
+        #                                        block_size=128
+        #                                    ).fit(np.array(hsgdf_all[['x', 'y']]))
+        #t3 = time.perf_counter()
 
+        #print(f"DBSCAN time: {t1 - t0:.3f}s")
+        #print(f"ParallelEpsDBSCAN time: {t3 - t2:.3f}s")
+        #same_labels = np.array_equal(np.sort(db.labels_), np.sort(db1.labels_))
+        #print(f"Same labels: {same_labels}")
+        #pdb.set_trace()
         # Add cluster labels to the GeoDataFrame
         hsgdf_all.loc[:,['cluster']] = db.labels_
 
@@ -783,12 +808,16 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
 
         # Choose a value for alpha. Smaller => tighter shape. You can tune this.
         alpha = 0.001  # Try different values
-
+    
+        #hsgdf_all = hsgdf_all.drop_duplicates(subset=["latitude", "longitude"],keep='first')
         # Iterate through each fire event cluster
         for event_id, group in hsgdf_all.groupby('cluster_fire_event'):
-            group = group.drop_duplicates(subset=["latitude", "longitude"],keep='first')
+            #group = group.drop_duplicates(subset=["latitude", "longitude"],keep='first')
             points = [(pt.x, pt.y) for pt in group.geometry]
             
+            shape = MultiPoint(points).convex_hull
+            
+            '''
             if len(points) <= 4:
                 # Not enough points to compute alpha shape; fall back to convex hull or skip
                 shape = MultiPoint(points).convex_hull
@@ -805,6 +834,7 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                         if (shape.is_empty):
                             print('pb in alphashape -- empty geom generated')
                             print(f'len(points) = {len(points)}')
+            '''
             alpha_shapes.append({
                 'cluster_fire_event': event_id,
                 'geometry': shape
@@ -983,6 +1013,11 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                 element = fireEvents[id_]
                 fireEvents[id_] = None
                 nbre_removed_event += 1
+
+                mask_geom = unary_union(element.ctrs.geometry)
+                mask = hsgdf_all_raw.geometry.intersects(mask_geom)
+                hsgdf_all_raw = hsgdf_all_raw.loc[~mask].copy()
+
                 if flag_PastFireEvent: 
                     #for event in pastFireEvents:
                     #    if event.id_fire_event == 872: pdb.set_trace()
@@ -1456,6 +1491,7 @@ def run_fire_tracking(args):
         #control hourly loop
         current += timedelta(minutes=dt_minutes)
 
+
     with open(log_dir+'/timeControl.txt','w') as f:
         f.write(end_time.strftime('%Y-%m-%d_%H%M'))
 
@@ -1468,6 +1504,12 @@ if __name__ == '__main__':
     SILEX
     domain: -10,35,20,46
     '''
+    t0 = time.perf_counter()
+    #pr = cProfile.Profile()
+    #pr.enable()
+
+
+
     print('FET start!')
     tracemalloc.start()
     
@@ -1485,7 +1527,6 @@ if __name__ == '__main__':
     run_fire_tracking(args)
 
     print('FET done!')
-    sys.exit()
 
     '''
     import cProfile
@@ -1495,3 +1536,11 @@ if __name__ == '__main__':
     p = pstats.Stats('profile_output')
     p.strip_dirs().sort_stats('cumtime').print_stats(20)
     '''
+    
+    tf = time.perf_counter()
+    print(f"whole time: {tf - t0:.3f}s")
+
+    #s = io.StringIO()
+    #ps = pstats.Stats(pr, stream=s).sort_stats("cumulative")
+    #ps.print_stats(30)   # top 30 entries
+    #print(s.getvalue())
