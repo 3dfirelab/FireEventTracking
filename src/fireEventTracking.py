@@ -1374,8 +1374,8 @@ def run_fire_tracking(args):
     
     elif ('MED' in inputName ): 
         params = init(inputName,sensorName,log_dir) 
-        if os.path.isfile(log_dir+'/timeControl.txt'): 
-            with open(log_dir+'/timeControl.txt','r') as f:
+        if os.path.isfile(log_dir+f'/timeControl_{inputName}.txt'): 
+            with open(log_dir+f'/timeControl_{inputName}.txt','r') as f:
                 start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
@@ -1393,8 +1393,8 @@ def run_fire_tracking(args):
 
     elif ('SILEX' in inputName) or ('PORTUGAL' in inputName)  or ('MED' in inputName ) or ('RIBAUTE' in inputName): 
         params = init(inputName,sensorName,log_dir) 
-        if os.path.isfile(log_dir+'/timeControl.txt'): 
-            with open(log_dir+'/timeControl.txt','r') as f:
+        if os.path.isfile(log_dir+f'/timeControl_{inputName}.txt'): 
+            with open(log_dir+f'/timeControl_{inputName}.txt','r') as f:
                 start = datetime.strptime(f.readline().strip(), '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
         else:
             start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
@@ -1492,7 +1492,7 @@ def run_fire_tracking(args):
         current += timedelta(minutes=dt_minutes)
 
 
-    with open(log_dir+'/timeControl.txt','w') as f:
+    with open(log_dir+f'/timeControl_{inputName}.txt','w') as f:
         f.write(end_time.strftime('%Y-%m-%d_%H%M'))
 
 
