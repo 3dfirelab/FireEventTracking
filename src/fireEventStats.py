@@ -249,7 +249,7 @@ def run_fire_stats(args):
     root = Path(params['event']['dir_data'])
     os.makedirs(params['event']['dir_data']+'Stats/', exist_ok=True)
     os.makedirs(f"{params['event']['dir_data']}/FRP-FROS/", exist_ok=True)
-
+    os.makedirs(f"{params['event']['dir_data']}/Stats/GeoJson", exist_ok=True)
     # regex to extract datetime from directory name
     pattern = re.compile(r"Pickles_active_(\d{4}-\d{2}-\d{2}_\d{4})")
 
@@ -378,12 +378,14 @@ def run_fire_stats(args):
             t_ = pd.to_datetime(event.times)
             t_sec = (t_ - t_[0]).total_seconds().values
             fre_ = np.trapezoid(frp_, t_sec)
+            
+            t_ = pd.to_datetime(event.times)
            
             gdf_ = gpd.GeoDataFrame(
                     {
                         "center_igni":event.centers[0], 
-                        "time_start": pd.to_datetime(event.times[0]),
-                        "time_end": pd.to_datetime(event.times[-1]),
+                        "time_start": t_.floor("30 min")[0],
+                        "time_end": t_.floor("30 min")[-1],
                         "fre": fre_,
                         "fire_event_id": event.id_fire_event,
                         "fire_name": event.fire_name,
@@ -393,7 +395,20 @@ def run_fire_stats(args):
                     crs=event.ctrs.crs, 
                     index=[0],
                 )
-            
+           
+            #save indiviual geojson per event
+            #event = fireEvent.load_fireEvent(event_file)
+            gdf__ = gpd.GeoDataFrame(
+                                        {
+                                            "time": t_, 
+                                            "time_floor": t_.floor("30 min"), 
+                                            "geometry": event.ctrs.geometry.values,
+                                        },
+                                        crs=event.ctrs.crs,   # preserve original CRS
+                                   )
+            filename_fire_feature = f"{params['event']['dir_data']}/Stats/GeoJson/gdf_{event.id_fire_event}.geojson"
+            gdf__.to_file(filename_fire_feature, driver="GeoJSON")
+
             if gdf_events_all is None:
                 gdf_events_all = gdf_
             else:
