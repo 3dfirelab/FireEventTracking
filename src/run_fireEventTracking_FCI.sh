@@ -32,6 +32,7 @@ if [ "$1" = "log_dir" ]; then
 
 elif [ "$1" != "run" ]; then
     echo "Usage: $0 {log_dir|run} {runName}"
+    echo recieved arg: $1 $2
     exit 1
 fi
 
