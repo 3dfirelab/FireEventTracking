@@ -95,6 +95,7 @@ class Event:
         #keep only the one that match self.times
         hsidx_ = cluster.indices_hs
         hs_ = hs_all.loc[hsidx_]
+        hs_['timestamp'] = hs_['timestamp'].dt.tz_localize('UTC')
         hs_ = hs_[hs_['timestamp']==self.times[-1]]
         self.indices_hs = [hs_.index]
 
@@ -104,7 +105,7 @@ class Event:
         hsfrps =  hs_all.loc[self.indices_hs[-1]].frp.tolist()
         self.hspots['frp'] = None 
         self.hspots.at[0,'frp'] = hsfrps
-        
+       
         self.areas = self.ctrs.geometry.area.to_list()
 
         #if  self.id_fire_event == 10:
@@ -117,6 +118,7 @@ class Event:
     
         self.fros = [-999]
         self.fros_v = [None]
+        self.fros_flag_Fctrs = None
 
         #self.cloudMask = getCloudMask(params, self.times[-1], self.ctrs.iloc[-1])
 
@@ -134,6 +136,7 @@ class Event:
         #keep only the one that match self.times
         hsidx_ = cluster.indices_hs
         hs_ = hs_all.loc[hsidx_]
+        hs_['timestamp'] = hs_['timestamp'].dt.tz_localize('UTC')
         hs_ = hs_[hs_['timestamp']==self.times[-1]]
         self.indices_hs.append( hs_.index )
         
@@ -146,7 +149,7 @@ class Event:
         self.hspots.at[self.hspots.index[-1], 'frp'] = hsfrps
       
         self.areas = self.ctrs.geometry.area.to_list()
-        
+       
         if len(self.fros) != len(self.frps)-1 :
             pdb.set_trace()
     
@@ -157,6 +160,7 @@ class Event:
                 if last_two.geometry.iloc[-2].equals( last_two.geometry.iloc[-1]): 
                     self.fros.append(0.0)
                     self.fros_v.append( None )
+                    self.fros_flag_Fctrs = None    
                 else:
                     fros_data = getFROS.compute_polygon_velocity(last_two[::-1])
                
@@ -165,18 +169,23 @@ class Event:
                         coords = [(fros_data.inner_pt_x[0], fros_data.inner_pt_y[0]), 
                                   (fros_data.outer_pt_x[0], fros_data.outer_pt_y[0])]
                         self.fros_v.append( LineString(coords) )
+                        self.fros_flag_Fctrs = fros_data.flag_filter_ctr[0] 
+
                     else: 
                         self.fros.append(-999)
                         self.fros_v.append( None )
+                        self.fros_flag_Fctrs = None    
             else: 
                 self.fros.append(-999)
                 self.fros_v.append( None ) 
+                self.fros_flag_Fctrs = None    
 
             
         else: 
             self.fros.append(-999)
             self.fros_v.append( None ) 
-       
+            self.fros_flag_Fctrs = None    
+   
         if len(self.fros) != len(self.frps):
             pdb.set_trace()
 
@@ -222,6 +231,7 @@ class Event:
         
         [self.fros.append(fros_) for fros_ in event.fros]
         [self.fros_v.append(fros_v_) for fros_v_ in event.fros_v]
+        [self.fros_flag_Fctrs.append(XX) for XX in event.fros_flag_Fctrs]
         
         #reorder in time sequence
         sorted_indices = np.argsort(self.times)
@@ -237,6 +247,7 @@ class Event:
         
         self.fros = [self.fros[ii] for ii in sorted_indices ]
         self.fros_v = [self.fros_v[ii] for ii in sorted_indices ]
+        self.fros_flag_Fctrs = [self.fros_flag_Fctrs[ii] for ii in sorted_indices ]
 
     def mergeWith(self, idx_dad):
         for i in idx_dad:

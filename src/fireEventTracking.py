@@ -45,7 +45,8 @@ import time
 import cProfile
 import pstats
 import io
-
+from sklearn.neighbors import NearestNeighbors
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # start tracking
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
@@ -483,6 +484,69 @@ def run_ffMNH_corte(params, event, lon, lat):
     else: 
         return None
 
+
+####################################################
+def inflate_points(points, eps, n=8):
+    angles = np.linspace(0, 2*np.pi, n, endpoint=False)
+    offsets = np.c_[np.cos(angles), np.sin(angles)] * eps
+
+    inflated = []
+    for p in points:
+        inflated.append(p)
+        for o in offsets:
+            inflated.append((p[0] + o[0], p[1] + o[1]))
+    return inflated
+
+
+####################################################
+# --- your helper must be defined at top-level for multiprocessing pickling ---
+def compute_shape_for_event(args):
+    event_id, points = args  # points: list[(x,y)]
+
+    # Guard against pathological inputs
+    if points is None or len(points) == 0:
+        return {"cluster_fire_event": event_id, "geometry": MultiPoint([])}
+
+    # Fallback for small clusters
+    if len(points) <= 4:
+        shape = MultiPoint(points).convex_hull
+        return {"cluster_fire_event": event_id, "geometry": shape}
+
+    coords = np.asarray(points, dtype=float)
+
+    # If points collapse / duplicates, NN distances can be 0 -> alpha inf
+    nbrs = NearestNeighbors(n_neighbors=2).fit(coords)
+    d2 = nbrs.kneighbors(coords)[0][:, 1]
+    d_min = float(np.min(d2))
+    d_nn = float(np.mean(d2))
+
+    if not np.isfinite(d_nn) or d_nn <= 0:
+        shape = MultiPoint(points).convex_hull
+        return {"cluster_fire_event": event_id, "geometry": shape}
+
+    alpha = 1.0 / d_nn
+
+    # assumes inflate_points is available at top-level too
+    points_reg = inflate_points(points, eps=d_min / 4 if d_min > 0 else 0.0)
+
+    shape = alphashape.alphashape(points_reg, alpha)
+
+    if shape.is_empty:
+        if len(points) <= 10:
+            shape = MultiPoint(points).convex_hull
+        else:
+            # backoff on alpha until non-empty or threshold
+            while shape.is_empty and alpha > 4e-4:
+                alpha *= 0.5
+                shape = alphashape.alphashape(points_reg, alpha)
+
+            if shape.is_empty:
+                # last-resort hull
+                shape = MultiPoint(points).convex_hull
+
+    return {"cluster_fire_event": event_id, "geometry": shape}
+
+
 ####################################################
 #def perimeter_tracking(params, start_datetime,end_datetime, flag_restart=False):
 def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
@@ -616,7 +680,7 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
             if (date_now+timedelta(minutes=dt_minutes_perimeters) < end_datetime) : 
                 print('skip [no hs]  ', end='\n')
             else:
-                print('skip [no hs]  ', end=' ')
+                print('skip [no hs]  ', end=81*' '+'|  ')
             date_now = date_now + timedelta(minutes=dt_minutes_perimeters)    
             idate+=1
             continue
@@ -706,7 +770,7 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
             #    pass
       
         #clean hsgdf_all_raw 
-        hsgdf_all_raw = hsgdf_all_raw.drop_duplicates(subset=["latitude", "longitude"],keep='first')
+        hsgdf_all_raw = hsgdf_all_raw.drop_duplicates(subset=["latitude", "longitude"],keep='last')
 
         hsgdf_all = hsgdf_all_raw.copy()
         # Use DBSCAN for spatial clustering (define 1000 meters as the spatial threshold)
@@ -807,45 +871,66 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
         alpha_shapes = []
 
         # Choose a value for alpha. Smaller => tighter shape. You can tune this.
-        alpha = 0.001  # Try different values
+        #alpha = 0.001  # Try different values
     
         #hsgdf_all = hsgdf_all.drop_duplicates(subset=["latitude", "longitude"],keep='first')
         # Iterate through each fire event cluster
+        '''
         for event_id, group in hsgdf_all.groupby('cluster_fire_event'):
             #group = group.drop_duplicates(subset=["latitude", "longitude"],keep='first')
             points = [(pt.x, pt.y) for pt in group.geometry]
             
-            shape = MultiPoint(points).convex_hull
+            #shape = MultiPoint(points).convex_hull
             
-            '''
+             
             if len(points) <= 4:
                 # Not enough points to compute alpha shape; fall back to convex hull or skip
                 shape = MultiPoint(points).convex_hull
             else:
-                shape = alphashape.alphashape(points, alpha)
+                coords = np.array(points)
+                nbrs = NearestNeighbors(n_neighbors=2).fit(coords)
+                d_min = nbrs.kneighbors(coords)[0][:,1].min()
+                d_nn = nbrs.kneighbors(coords)[0][:,1].mean()
+                alpha = 1./(d_nn)
+
+                points_reg = inflate_points(points, eps=d_min/4)
+                shape = alphashape.alphashape(points_reg, alpha)
                 if (shape.is_empty): 
                     if (len(points)<=10): 
                         shape = MultiPoint(points).convex_hull
                     else: 
                         while shape.is_empty:
-                            shape = alphashape.alphashape(points, alpha)
-                            alpha -= 0.0001
-                            if alpha == 0.0004: break
+                            shape = alphashape.alphashape(points_reg, alpha)
+                            alpha *= 0.5
+                            #alpha -= 0.0001
+                            if alpha <= 0.0004: break
                         if (shape.is_empty):
                             print('pb in alphashape -- empty geom generated')
                             print(f'len(points) = {len(points)}')
-            '''
+            
             alpha_shapes.append({
                 'cluster_fire_event': event_id,
                 'geometry': shape
             })
+        '''
+        # --- build lightweight payload once (avoid passing groups/gdfs to workers) ---
+        event_points = {
+            event_id: [(pt.x, pt.y) for pt in group.geometry]
+            for event_id, group in hsgdf_all.groupby("cluster_fire_event")
+        }
+        max_workers = int(os.environ['ntask'])  # or e.g. os.cpu_count() - 1
+
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            futures = [ex.submit(compute_shape_for_event, item) for item in event_points.items()]
+            for fut in as_completed(futures):
+                alpha_shapes.append(fut.result())
 
         # Create GeoDataFrame of alpha shapes per event
         alpha_shape_gdf = gpd.GeoDataFrame(alpha_shapes, crs=hsgdf_all.crs)
         fireCluster_ctr = alpha_shape_gdf
             
         #ensure poly are convex
-        fireCluster_ctr['geometry'] = fireCluster_ctr['geometry'].apply(make_convex)
+        #fireCluster_ctr['geometry'] = fireCluster_ctr['geometry'].apply(make_convex)
  
         #keep only cluster with at least one hs from dat_now
         idxs = fireCluster['end_time'] >= np.datetime64(date_now.replace(tzinfo=None))
@@ -855,7 +940,9 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
         #if len(fireEvents)>141:
         #    print('##########')
         #    print(len(fireEvents[141].times))
-        
+            
+        #if date_now == datetime(2025, 6, 18, 6, 0, tzinfo=timezone.utc):
+        #    pdb.set_trace()
 
         if len(fireEvents) == 0: 
             #if no fire event were initialized, we set all cluster as fire event
@@ -1014,9 +1101,9 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                 fireEvents[id_] = None
                 nbre_removed_event += 1
 
-                mask_geom = unary_union(element.ctrs.geometry)
-                mask = hsgdf_all_raw.geometry.intersects(mask_geom)
-                hsgdf_all_raw = hsgdf_all_raw.loc[~mask].copy()
+                mask_geom_ = unary_union(element.ctrs.geometry)
+                mask_ = hsgdf_all_raw.geometry.intersects(mask_geom_)
+                hsgdf_all_raw = hsgdf_all_raw.loc[~mask_].copy()
 
                 if flag_PastFireEvent: 
                     #for event in pastFireEvents:

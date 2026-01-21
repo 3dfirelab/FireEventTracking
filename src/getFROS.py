@@ -6,6 +6,8 @@ from shapely.ops import unary_union
 from shapely.validation import make_valid
 import pdb 
 import matplotlib.pyplot as plt
+import math
+
 # -------------------------------------------------------
 # Function definitions
 # -------------------------------------------------------
@@ -149,7 +151,7 @@ def compute_max_distance(outer, inner, dt, obstacles=None):
     inner_pts = get_coords(inner)
     if len(outer_pts) == 0 or len(inner_pts) == 0:
         return np.nan, None, None
-
+    
     obstacle_edges = []
     for geom in obstacles or []:
         if geom is None or geom.is_empty:
@@ -178,6 +180,22 @@ def compute_max_distance(outer, inner, dt, obstacles=None):
     #gpd.GeoDataFrame(geometry=[outer]).plot(facecolor='none', edgecolor='orange',linewidth=3,ax=ax)
     #gpd.GeoDataFrame(geometry=[inner]).plot(facecolor='none', edgecolor='blue',linewidth=3,ax=ax)
 
+    def screen_list_pts(mylist,max_pts = 500):
+        n = len(mylist)
+        flag_lower_pts_ctr = False
+        if n > max_pts:
+            step = math.ceil(n / max_pts)
+            mylist_sub = mylist[::step]
+            flag_lower_pts_ctr = True
+        else:
+            mylist_sub = mylist
+        return mylist_sub, flag_lower_pts_ctr
+    
+    outer_pts, flag_lower_pts_ctrO = screen_list_pts(outer_pts)
+    inner_pts, flag_lower_pts_ctrI = screen_list_pts(inner_pts)
+
+    flag_lower_pts_ctr = flag_lower_pts_ctrI or flag_lower_pts_ctrO
+
     for outer_pt in outer_pts:
         for edge in obstacle_edges:
             geoms = edge.geoms if hasattr(edge, "geoms") else [edge]
@@ -186,6 +204,7 @@ def compute_max_distance(outer, inner, dt, obstacles=None):
                     x, y = geom.xy
                     #ax.plot(x, y, color='k', linewidth=4, linestyle=':')
         for inner_pt in inner_pts:
+            #print('o', outer_pt, len(outer_pts), 'i', inner_pt, len(inner_pts))
             segment = LineString([(outer_pt[0], outer_pt[1]), (inner_pt[0], inner_pt[1])])
             if not outer.contains(segment):
                 continue
@@ -215,7 +234,7 @@ def compute_max_distance(outer, inner, dt, obstacles=None):
     #if best_outer is None or best_inner is None:
     #    return np.nan, None, None
 
-    return best_dist, best_outer, best_inner
+    return best_dist, best_outer, best_inner, flag_lower_pts_ctr
 
 # -------------------------------------------------------
 # Main processing function
@@ -250,14 +269,14 @@ def compute_polygon_velocity(gdf):
         raise ValueError("GeoDataFrame must have a projected CRS (units in meters).")
 
     results = []
-
+    
     for i, row_i in gdf.iterrows():
         outer = row_i.geometry
         if not isinstance(outer, Polygon) or outer.is_empty:
             continue
 
         for j, row_j in gdf.iloc[i + 1:].iterrows():
-            #print(j)
+            #print(j, row_j)
             inner = row_j.geometry
             if not isinstance(inner, Polygon) : #or inner.is_empty:
                 continue
@@ -284,7 +303,7 @@ def compute_polygon_velocity(gdf):
 
             # Compute maximum vertex distance
             obstacle_geoms = gdf.geometry.tolist()
-            max_dist, outer_pt, inner_pt = compute_max_distance(outer, inner, dt_hours, obstacle_geoms )
+            max_dist, outer_pt, inner_pt, flag_lower_pts_ctr = compute_max_distance(outer, inner, dt_hours, obstacle_geoms )
            
            
             velocity = []
@@ -316,6 +335,7 @@ def compute_polygon_velocity(gdf):
                 "outer_pt_y": vector_line_out.coords[-1][1],
                 "inner_pt_x": vector_line_out.coords[0][0],
                 "inner_pt_y": vector_line_out.coords[0][1],
+                "flag_filter_ctr": flag_lower_pts_ctr,
                 "geometry": vector_line_out,
             })
             

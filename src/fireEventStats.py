@@ -247,7 +247,7 @@ def run_fire_stats(args):
         print(' ')
 
     root = Path(params['event']['dir_data'])
-    os.makedirs(params['event']['dir_data']+'Stats/', exist_ok=True)
+    os.makedirs(params['event']['dir_data']+'/Stats/', exist_ok=True)
     os.makedirs(f"{params['event']['dir_data']}/FRP-FROS/", exist_ok=True)
     os.makedirs(f"{params['event']['dir_data']}/Stats/GeoJson", exist_ok=True)
     # regex to extract datetime from directory name
@@ -309,7 +309,8 @@ def run_fire_stats(args):
             event = fireEvent.load_fireEvent(event_file)
             weekEvents.append( event ) 
             weekEvents_files.append(event_file)
-           
+          
+
             #saved FRP and FROS time series for each event in FRP_FROS dir
             if len(event.fros) == len(event.frps) : 
                     dfts = pd.DataFrame({'timestamp':event.times, 'frp':event.frps, 'fros':event.fros})

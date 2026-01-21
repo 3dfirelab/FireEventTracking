@@ -1,0 +1,25 @@
+# config.yaml
+general:
+  domain: 38.16,36.4,41,37.5
+  domainName: 'MEDpc'
+  crs: 3035
+  use_sedoo_drive: False 
+  root_data: /media/paugam/gast/
+hs:
+  dir_data: ORIGIN/hotspots2025
+  sats: ['']
+event:
+  dir_data: ORIGIN/MEDpc_fire_events 
+  dir_geoJson: ORIGIN/MEDpc_fire_events/GeoJson
+  dir_frp: ORIGIN/MEDpc_fire_events/FRP
+  dir_cloudMask: ORIGIN/RASTER/cloudMask/
+  start_time:    '2025-06-10_0000'
+  end_time_hard: '2025-06-30_2350'
+  mask_HS: /media/paugam/gast/HSDensity_VIIRS2025/data_mask_buffer_3857.geojson
+  eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
+  cloudMask_mtg: "FCI/RASTER/cloudMask/"
+  dir_hs_log: "ORIGIN/MEDpc_fire_events/HS_log/"
+postproc:
+  dir_FWI:  AROME/FWI
+  dir_WIND: AROME/FORECAST/WIND/
+
