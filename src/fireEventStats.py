@@ -164,10 +164,10 @@ def run_fire_stats(args):
         start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
         end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
     
-    elif inputName == 'ribaute': 
+    elif inputName == 'RIBAUTE': 
         params = fet.init(inputName,sensorName) 
-        start = datetime.strptime(params['general']['time_start'], '%Y-%m-%d_%H%M')
-        end = datetime.strptime(params['general']['time_end'], '%Y-%m-%d_%H%M')
+        start = datetime.strptime(params['event']['start_time'], '%Y-%m-%d_%H%M')
+        end = datetime.strptime(params['event']['end_time'], '%Y-%m-%d_%H%M')
     
     elif ('MED' in inputName ): 
         params = fet.init(inputName,sensorName) 
@@ -284,13 +284,32 @@ def run_fire_stats(args):
     df_final["year"] = df_final["datetime"].dt.isocalendar().year
     df_final["week"] = df_final["datetime"].dt.isocalendar().week
     df_final["month"] = df_final["datetime"].dt.month
+   
     
     # group by ISO year-week
     grouped = df_final.groupby(["year", "week",])
 
+    #to get fire id of fire that merged
+    #print('load merging fie info: ')
+    #sys.stdout.flush()
+    #fire_merged = {}
+    #for ie, event_file in enumerate(df_final.file):
+    #    print ( f'{ie*100./ df_final.shape[0]:.2f} %', end='\r')
+    #    event = fireEvent.load_fireEvent(event_file)
+    #    if len(event.id_fire_event_dad) == 0: 
+    #        continue
+    #    else:
+    #        for id_ in event.id_fire_event_dad:
+    #            fire_merged[id_]=event.id_fire_event
+    #print('done               ')
+
+    list_pb_in_merged_fire = []
+    
+    gdfs = []
+
     data_per_week = []
     data_per_week_all = []
-    gdf_events_all = None
+    #gdf_events_all = None
     for (year, week,), df_week in grouped:
         print(f"Processing YEAR={year}, WEEK={week}, N={len(df_week)}")
 
@@ -309,8 +328,7 @@ def run_fire_stats(args):
             event = fireEvent.load_fireEvent(event_file)
             weekEvents.append( event ) 
             weekEvents_files.append(event_file)
-          
-
+         
             #saved FRP and FROS time series for each event in FRP_FROS dir
             if len(event.fros) == len(event.frps) : 
                     dfts = pd.DataFrame({'timestamp':event.times, 'frp':event.frps, 'fros':event.fros})
@@ -373,6 +391,7 @@ def run_fire_stats(args):
 
         plot(params, year, week, [], weekEvents, flag_plot_hs=False, flag_remove_singleHs=True)
    
+        
         for event,event_file in zip(weekEvents,weekEvents_files):
             
             frp_ = np.array(event.frps)              # MW
@@ -381,28 +400,39 @@ def run_fire_stats(args):
             fre_ = np.trapezoid(frp_, t_sec)
             
             t_ = pd.to_datetime(event.times)
-           
+         
+            time_merge = event.time_merging[0] if (len(event.time_merging)==1) else None
+            
+            if len(event.time_include) == 0: 
+                times_include = None
+            else:
+                times_include = ';'.join( [xx.strftime("%Y-%m-%d_%H:%M:%S") for xx in event.time_include] )
+
             gdf_ = gpd.GeoDataFrame(
                     {
                         "center_igni":event.centers[0], 
                         "time_start": t_.floor("30 min")[0],
                         "time_end": t_.floor("30 min")[-1],
+                        "time_merged": time_merge,
                         "fre": fre_,
                         "fire_event_id": event.id_fire_event,
                         "fire_name": event.fire_name,
-                        "file": event_file
+                        "file": event_file,
+                        "dad_event": ';'.join(map(str, event.id_fire_event_dad)),
+                        "son_event": ';'.join(map(str, event.id_fire_event_son)),
+                        "time_include": times_include,
                     },
                     geometry=[event.ctrs['geometry'].iloc[-1]],
                     crs=event.ctrs.crs, 
                     index=[0],
                 )
-           
             #save indiviual geojson per event
             #event = fireEvent.load_fireEvent(event_file)
             gdf__ = gpd.GeoDataFrame(
                                         {
                                             "time": t_, 
                                             "time_floor": t_.floor("30 min"), 
+                                            "frp": frp_, 
                                             "geometry": event.ctrs.geometry.values,
                                         },
                                         crs=event.ctrs.crs,   # preserve original CRS
@@ -410,11 +440,17 @@ def run_fire_stats(args):
             filename_fire_feature = f"{params['event']['dir_data']}/Stats/GeoJson/gdf_{event.id_fire_event}.geojson"
             gdf__.to_file(filename_fire_feature, driver="GeoJSON")
 
-            if gdf_events_all is None:
-                gdf_events_all = gdf_
-            else:
-                gdf_events_all = pd.concat([gdf_, gdf_events_all])
+            gdfs.append(gdf_)
 
+        #    if gdf_events_all is None:
+        #        gdf_events_all = gdf_
+        #    else:
+        #        gdf_events_all = pd.concat([gdf_, gdf_events_all])
+
+    # single concat → stable dtype inference
+    gdf_events_all = gpd.GeoDataFrame(
+        pd.concat(gdfs, ignore_index=True),
+        crs=gdfs[0].crs if gdfs else None )
 
     df_weekly = pd.DataFrame(
                                 data_per_week,
@@ -437,7 +473,11 @@ def run_fire_stats(args):
     gdf_events_all.to_file("{:s}/Stats/{:s}-gdf_{:s}_{:s}.geojson".format(
                             params['event']['dir_data'],params['general']['domainName'], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")), driver="GeoJSON")
 
-    return df_weekly
+    if len(list_pb_in_merged_fire) > 0: 
+        print(f'found {len(list_pb_in_merged_fire)} with tagged fire son that does not contains stoped fire dad')
+        print(list_pb_in_merged_fire)
+
+    return df_weekly, gdf_events_all
 
 #############################
 if __name__ == '__main__':
@@ -459,5 +499,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    df_weekly = run_fire_stats(args)
+    df_weekly, gdf_events_all = run_fire_stats(args)
 

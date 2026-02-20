@@ -46,7 +46,7 @@ import cProfile
 import pstats
 import io
 from sklearn.neighbors import NearestNeighbors
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing as mp
 
 # start tracking
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
@@ -554,7 +554,9 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
     start_datetime = datetime.strptime(f'{start_datetime}', '%Y-%m-%d_%H%M' ).replace(tzinfo=timezone.utc)
     #end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
     
-    gdf_postcode = gpd.read_file(params['general']['root_data']+'/'+params['event']['eurostat'])
+    #gdf_postcode = gpd.read_file(params['general']['root_data']+'/'+params['event']['eurostat'])
+    gdf_postcode = gpd.read_file(params['general']['root_data']+'/'+params['event']['osm_bndf'])
+    gdf_postcode['nbreFire'] = np.zeros(len(gdf_postcode), dtype=int)
 
     #load fire event
     fireEvents = []
@@ -596,12 +598,18 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                     fireEvents.append(None)
                     ii += 1
                 #fireEvents.append( fireEvent.load_fireEvent(event_file) ) 
-                fireEvents.append( event ) 
+                last_id_fire_event = event.id_fire_event
+                if len(event.time_merging) != 0 :
+                    fireEvents.append(None)
+                else:
+                    fireEvents.append( event ) 
                 ii += 1
+            
             if ii > 0:  
-                fireEvent.Event._id_counter = fireEvents[-1].id_fire_event +1
+                fireEvent.Event._id_counter = last_id_fire_event + 1
             else: 
                 pdb.set_trace()
+            
             shutil.rmtree(local_dir)
 
             # Set your directory and threshold date
@@ -655,13 +663,17 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
     #print('init list Events: ', count_not_none(fireEvents), len(pastFireEvents))
     idate = 0
     flag_get_new_hs = False
+        
+    # Collect tasks for parallel copy
+    copy_tasks = []
+    # Create a temporary directory for storing plots
+    tmp_dir = tempfile.mkdtemp() 
    
     time_arr   = [] 
     fixHS_arr  = []
     fireHS_arr = []
     while date_now<end_datetime:
         print(date_now.strftime("%Y-%m-%d_%H%M"), end=' | ')
-        
 
         #if len(fireEvents) == 0: 
         #    '''
@@ -918,16 +930,41 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
             event_id: [(pt.x, pt.y) for pt in group.geometry]
             for event_id, group in hsgdf_all.groupby("cluster_fire_event")
         }
-        max_workers = int(os.environ['ntask'])  # or e.g. os.cpu_count() - 1
+        event_items = list(event_points.items())
+        try:
+            ntask_env = int(os.environ.get("SLURM_NTASKS"))
+        except:
+            ntask_env = int(os.environ.get("ntask"))
+        if ntask_env is not None:
+            max_workers = max(1, int(ntask_env))
+        else:
+            max_workers = 1
+        max_workers = min(max_workers, len(event_items))
 
-        with ProcessPoolExecutor(max_workers=max_workers) as ex:
-            futures = [ex.submit(compute_shape_for_event, item) for item in event_points.items()]
-            for fut in as_completed(futures):
-                alpha_shapes.append(fut.result())
+        # Use multiprocessing only when it can help; keep a deterministic fallback.
+        use_multiprocessing = max_workers > 1 and len(event_items) > 3 and os.environ.get("FET_DISABLE_MP", "0") != "1"
+        if use_multiprocessing:
+            ctx = mp.get_context("spawn")
+            try:
+                with ctx.Pool(processes=max_workers) as pool:
+                    for res in pool.imap_unordered(compute_shape_for_event, event_items):
+                        alpha_shapes.append(res)
+            except Exception as err:
+                print(f" alpha-shape fallback [{type(err).__name__}] ", end='|')
+
+            # If pool run failed, finish missing events serially.
+            done_ids = {item["cluster_fire_event"] for item in alpha_shapes}
+            for item in event_items:
+                if item[0] not in done_ids:
+                    alpha_shapes.append(compute_shape_for_event(item))
+        else:
+            for item in event_items:
+                alpha_shapes.append(compute_shape_for_event(item))
 
         # Create GeoDataFrame of alpha shapes per event
         alpha_shape_gdf = gpd.GeoDataFrame(alpha_shapes, crs=hsgdf_all.crs)
-        fireCluster_ctr = alpha_shape_gdf
+        fireCluster_ctr = fireCluster[["cluster_fire_event"]].merge(alpha_shape_gdf, on="cluster_fire_event", how="left")
+        fireCluster_ctr = gpd.GeoDataFrame(fireCluster_ctr, geometry="geometry", crs=hsgdf_all.crs)
             
         #ensure poly are convex
         #fireCluster_ctr['geometry'] = fireCluster_ctr['geometry'].apply(make_convex)
@@ -1012,18 +1049,23 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                             except:
                                 pdb.set_trace()
                         
-                        fireEvents[idx_event].mergeWith(other_indices)
-                        
+                        fireEvents[idx_event].mergeWith(other_indices, fireEvents)
+                       
                         #set merged event to past event
                         for index_ in other_indices:
                             #print('--', index_)
                             element = fireEvents[index_]
+                            
+                            tmp_filePkl, dest_filePkl = element.save('active', params, start_datetime, local_dir=tmp_dir)
+                            copy_tasks.append((tmp_filePkl, dest_filePkl))
+                            
                             fireEvents[index_] = None
                             if flag_PastFireEvent: 
                                 #for event in pastFireEvents:
                                 #    if event.id_fire_event == 872: pdb.set_trace()
                                 pastFireEvents.append(element)
 
+                        
                         gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
                         #flag_found_matchingEvent = True
                         continue
@@ -1062,12 +1104,16 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                         for index_ in other_indices:
                             fireEvents[idx_event].merge(fireEvents[index_])
                         
-                        fireEvents[idx_event].mergeWith(other_indices)
+                        fireEvents[idx_event].mergeWith(other_indices, fireEvents)
                         
                         #set merged event to past event
                         for index_ in other_indices:
                             #print('--', index_)
                             element = fireEvents[index_]
+                            
+                            tmp_filePkl, dest_filePkl = element.save('active', params, start_datetime, local_dir=tmp_dir)
+                            copy_tasks.append((tmp_filePkl, dest_filePkl))
+
                             fireEvents[index_] = None
                             if flag_PastFireEvent: 
                                 #for event in pastFireEvents:
@@ -1089,8 +1135,6 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                 fireEvents.append(new_event)
                 post_on_discord_and_runffMNH(params,new_event)
 
-
-            
 
         #remove fireEvent that were updated more than two day ago. 
         nbre_removed_event = 0
@@ -1159,11 +1203,8 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                 plt.close(fig)
         '''
 
-        # Create a temporary directory for storing plots
-        tmp_dir = tempfile.mkdtemp()
 
-        # Collect tasks for parallel copy
-        copy_tasks = []
+
 
         dir_Pkl = None
         # Loop over fire events
@@ -1193,7 +1234,7 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                 tmp_filePkl, dest_filePkl = event.save('active', params, start_datetime, local_dir=tmp_dir)
                 copy_tasks.append((tmp_filePkl, dest_filePkl))
                 if dir_Pkl == None: dir_Pkl = os.path.dirname(dest_filePkl)
-               
+
                 ##save time series of FRP in npy file
                 #tmp_file = os.path.join(tmp_dir, f"{event.id_fire_event:09d}.npy")
                 #dest_file = os.path.join(params['event']['dir_frp'], f"{event.id_fire_event:09d}.npy")
@@ -1251,7 +1292,6 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
 
         # Optional cleanup (uncomment to remove temp dir after copy)
         shutil.rmtree(tmp_dir)
-    
 
         if flag_PastFireEvent:
             print('  FireEvents saved: active: {:6d}  past: {:6d}'.format(count_not_none(fireEvents), len(pastFireEvents)))
@@ -1264,6 +1304,7 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
             #top_stats = snapshot.statistics("lineno")
             #for big in top_stats[0:10]:
             #    print(big)
+
 
     for id_, event in enumerate(pastFireEvents):
         event.save( 'past', params)
@@ -1508,7 +1549,7 @@ def run_fire_tracking(args):
     else:
         print('missing inputName')
         sys.exit()
-    
+   
     #make sure all time are UTC
     start = start.replace(tzinfo=timezone.utc)
     end   = end.replace(tzinfo=timezone.utc) #- timedelta(hours=1)

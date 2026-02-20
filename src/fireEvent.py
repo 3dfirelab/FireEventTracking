@@ -86,11 +86,14 @@ class Event:
         self.times = [cluster.end_time.tz_localize('UTC')]
         self.time_ranges = [(cluster.start_time.tz_localize('UTC'),cluster.end_time.tz_localize('UTC'))]
         self.cluster_fire_event = [ctr.cluster_fire_event]
-        self.ctrs  = gpd.GeoDataFrame([{'geometry':ctr.geometry}] ,crs=crs, geometry='geometry')
+        self.ctrs  = gpd.GeoDataFrame([{'id_fire_event': self.id_fire_event, 'geometry':ctr.geometry}] ,crs=crs, geometry='geometry')
         self.centers = [Point(cluster.x, cluster.y)]
         self.frps = [cluster.frp]
 
         self.fire_name = assign_single_fire_name(self, gdf_postcode)    
+
+        mask = gdf_postcode['name_en_clean'] == self.fire_name
+        gdf_postcode.loc[mask,'nbreFire'] +=1 
 
         #keep only the one that match self.times
         hsidx_ = cluster.indices_hs
@@ -115,10 +118,14 @@ class Event:
         #    plt.show()
 
         self.id_fire_event_dad = []
-    
+        self.time_include = []
+        
+        self.id_fire_event_son = []
+        self.time_merging = []
+
         self.fros = [-999]
         self.fros_v = [None]
-        self.fros_flag_Fctrs = None
+        self.fros_flag_Fctrs = [None]
 
         #self.cloudMask = getCloudMask(params, self.times[-1], self.ctrs.iloc[-1])
 
@@ -129,7 +136,7 @@ class Event:
         self.times.append( cluster.end_time.tz_localize('UTC'))
         self.time_ranges.append((cluster.start_time.tz_localize('UTC'),cluster.end_time.tz_localize('UTC')))
         self.cluster_fire_event.append(ctr.cluster_fire_event)
-        self.ctrs = pd.concat([self.ctrs, gpd.GeoDataFrame([{'geometry':ctr.geometry}],crs=crs, geometry='geometry')]).reset_index(drop=True)
+        self.ctrs = pd.concat([self.ctrs, gpd.GeoDataFrame([{'id_fire_event': self.id_fire_event , 'geometry':ctr.geometry}],crs=crs, geometry='geometry')]).reset_index(drop=True)
         self.centers.append(Point(cluster.x, cluster.y))
         self.frps.append(cluster.frp)
 
@@ -160,7 +167,7 @@ class Event:
                 if last_two.geometry.iloc[-2].equals( last_two.geometry.iloc[-1]): 
                     self.fros.append(0.0)
                     self.fros_v.append( None )
-                    self.fros_flag_Fctrs = None    
+                    self.fros_flag_Fctrs.append( None )  
                 else:
                     fros_data = getFROS.compute_polygon_velocity(last_two[::-1])
                
@@ -169,22 +176,24 @@ class Event:
                         coords = [(fros_data.inner_pt_x[0], fros_data.inner_pt_y[0]), 
                                   (fros_data.outer_pt_x[0], fros_data.outer_pt_y[0])]
                         self.fros_v.append( LineString(coords) )
-                        self.fros_flag_Fctrs = fros_data.flag_filter_ctr[0] 
+                        self.fros_flag_Fctrs.append( fros_data.flag_filter_ctr[0] )
 
                     else: 
                         self.fros.append(-999)
                         self.fros_v.append( None )
-                        self.fros_flag_Fctrs = None    
+                        self.fros_flag_Fctrs.append( None ) 
             else: 
                 self.fros.append(-999)
                 self.fros_v.append( None ) 
-                self.fros_flag_Fctrs = None    
-
+                try: 
+                    self.fros_flag_Fctrs.append( None )   
+                except: 
+                    pdb.set_trace()
             
         else: 
             self.fros.append(-999)
             self.fros_v.append( None ) 
-            self.fros_flag_Fctrs = None    
+            self.fros_flag_Fctrs.append( None )
    
         if len(self.fros) != len(self.frps):
             pdb.set_trace()
@@ -249,9 +258,14 @@ class Event:
         self.fros_v = [self.fros_v[ii] for ii in sorted_indices ]
         self.fros_flag_Fctrs = [self.fros_flag_Fctrs[ii] for ii in sorted_indices ]
 
-    def mergeWith(self, idx_dad):
+    def mergeWith(self, idx_dad, fireEvents):
         for i in idx_dad:
             self.id_fire_event_dad.append(i)
+            self.time_include.append( self.times[-1] ) 
+
+            fireEvents[i].id_fire_event_son.append(self.id_fire_event)
+            fireEvents[i].time_merging.append( self.times[-1] )
+            
 
     def save(self, status, params, datetime_now=None, local_dir=None):
         if status == 'active':
@@ -367,7 +381,8 @@ def assign_single_fire_name(self, gdf_postcode: gpd.GeoDataFrame) -> str:
     # Spatial join
     joined = gpd.sjoin(
         gdf_point,
-        gdf_postcode[["geometry", "NSI_CODE", "COMM_NAME", "CNTR_CODE", "NUTS_CODE"]],
+        #gdf_postcode[["geometry", "NSI_CODE", "COMM_NAME", "CNTR_CODE", "NUTS_CODE"]],
+        gdf_postcode,
         how="left",
         predicate="intersects"
     )
@@ -377,12 +392,10 @@ def assign_single_fire_name(self, gdf_postcode: gpd.GeoDataFrame) -> str:
     # Compose fire_name
     fire_name = (
         "fire_" +
-        (row["CNTR_CODE"] if pd.notnull(row["CNTR_CODE"]) else "XX") + "_" +
-        (str(row["NSI_CODE"]) if pd.notnull(row["NSI_CODE"]) else "00000") + "_" +
-        (row["COMM_NAME"].replace(" ", "") if pd.notnull(row["COMM_NAME"]) else "UnknownCity") + "_" +
-        (str(row["NUTS_CODE"]) if pd.notnull(row["NUTS_CODE"]) else "00000") + "_" +
+        (row["name_en_clean"] if pd.notnull(row["name_en_clean"]) else "XX") + "_" +
         time.strftime("%Y%m%d")
     )
+
 
     return fire_name
 
