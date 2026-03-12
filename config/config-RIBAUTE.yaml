@@ -4,7 +4,7 @@ general:
   domainName: 'RIBAUTE'
   crs: 3035
   use_sedoo_drive: False 
-  root_data: /data/shared/
+  root_data: /data/paugam/FET-TEST
 hs:
   dir_data: ORIGIN/hotspots2025
   sats: ['']
@@ -15,8 +15,7 @@ event:
   dir_cloudMask: ORIGIN/RASTER/cloudMask/
   start_time: '2025-08-05_1400'
   end_time: '2025-08-06_1200'
-  mask_HS: /data/shared/HSDensity_VIIRS2025/data_mask_buffer_3857.geojson
-  #eurostat: 'EUROSTAT/COMM_RG_01M_2016_3035.gpkg'
+  mask_HS: /data/paugam/FET-TEST/HS-MASK/data_mask_buffer_3857.geojson
   osm_bndf: 'OSM_Boundaries/osm_MED_admin_muni_boundaries.gpkg'
   cloudMask_mtg: "FCI/RASTER/cloudMask/"
   dir_hs_log: "ORIGIN/RIBAUTE_fire_events/HS_log/"

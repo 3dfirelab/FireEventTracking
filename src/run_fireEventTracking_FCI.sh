@@ -2,20 +2,30 @@
 source ~/.myKeys.sh
 if [ "$(hostname)" = "portmtg" ]; then
     export srcDir=/home/vost/Src/FireEventTracking/src
-    export rootDataDir=/home/vost/Data
     export mambaDir=/home/vost/miniforge3/condabin/
 elif [ "$(hostname)" = "pc70852" ]; then
     export srcDir=/home/paugam/Src/FireEventTracking/src
-    export rootDataDir=/media/paugam/gast
     export mambaDir=/home/paugam/miniforge3/condabin/
 elif [ "$(hostname)" = "andall" ]; then
     export srcDir=/home/paugam/Src/FireEventTracking/src
-    export rootDataDir=/data/shared/
     export mambaDir=/home/paugam/miniforge3/condabin/
 fi
 #"$srcDir"/mount_aeris.sh
 
 runName=$2
+
+rootDataDir=$(python3 - "$runName" <<'PY'
+import yaml
+import sys
+
+run_name = sys.argv[1]
+
+with open(f"../config/config-{run_name}.yaml") as f:
+    cfg = yaml.safe_load(f)
+
+print(cfg["general"]["root_data"])
+PY
+)
 
 export dataDir=$rootDataDir/FCI/hotspots
 export ctrlDir=$rootDataDir/FCI/log

@@ -1578,6 +1578,7 @@ def run_fire_tracking(args):
     print(end)
     print('######################')
    
+
     if start == end: 
         print('end == start: stop here')
         sys.exit()
