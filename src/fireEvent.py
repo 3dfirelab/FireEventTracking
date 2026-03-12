@@ -263,6 +263,8 @@ class Event:
             self.id_fire_event_dad.append(i)
             self.time_include.append( self.times[-1] ) 
 
+            if fireEvents[i].id_fire_event != i : sys.exit(2)
+
             fireEvents[i].id_fire_event_son.append(self.id_fire_event)
             fireEvents[i].time_merging.append( self.times[-1] )
             
@@ -353,7 +355,7 @@ def average_min_distance(poly1, poly2, symmetric=True):
 
 
 ###########################
-def assign_single_fire_name(self, gdf_postcode: gpd.GeoDataFrame) -> str:
+def assign_single_fire_name(self, gdf_postcode: gpd.GeoDataFrame ) -> str:
     """
     Assign a fire_name to the last fire event using postcode spatial information.
 
@@ -368,8 +370,8 @@ def assign_single_fire_name(self, gdf_postcode: gpd.GeoDataFrame) -> str:
         Generated fire_name string.
     """
     # Get last center and time
-    point = self.centers[-1]
-    time = pd.to_datetime(self.times[-1])
+    point = self.centers[0]
+    time = pd.to_datetime(self.times[0])
 
     # Create temporary GeoDataFrame
     gdf_point = gpd.GeoDataFrame(
@@ -395,7 +397,6 @@ def assign_single_fire_name(self, gdf_postcode: gpd.GeoDataFrame) -> str:
         (row["name_en_clean"] if pd.notnull(row["name_en_clean"]) else "XX") + "_" +
         time.strftime("%Y%m%d")
     )
-
 
     return fire_name
 

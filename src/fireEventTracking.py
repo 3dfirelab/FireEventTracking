@@ -555,7 +555,7 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
     #end_datetime   = datetime.strptime(f'{end_datetime}', '%Y-%m-%d_%H%M').replace(tzinfo=timezone.utc)
     
     #gdf_postcode = gpd.read_file(params['general']['root_data']+'/'+params['event']['eurostat'])
-    gdf_postcode = gpd.read_file(params['general']['root_data']+'/'+params['event']['osm_bndf'])
+    gdf_postcode = gpd.read_file(params['general']['root_data']+'/'+params['event']['osm_bndf']).to_crs(params['general']['crs'])
     gdf_postcode['nbreFire'] = np.zeros(len(gdf_postcode), dtype=int)
 
     #load fire event
@@ -591,6 +591,13 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
             fireEvents_files = sorted(glob.glob( params['event']['dir_data']+'/Pickles_{:s}_{:s}/*.pkl'.format('active', start_time_last_available.strftime("%Y-%m-%d_%H%M"))))
             
             local_fireEvents_files, local_dir = cache_file(params, fireEvents_files)
+            file_id_fire_event = params['event']['dir_data'] + \
+                '/Pickles_{:s}_{:s}/id_fire_event.txt'.format(
+                    'active', start_time_last_available.strftime("%Y-%m-%d_%H%M")
+                )
+            with open(file_id_fire_event, "r") as f:
+                fireEvent.Event._id_counter  = int(f.read().strip())
+            
             ii = 0
             for id_, event_file in enumerate(local_fireEvents_files):
                 event = fireEvent.load_fireEvent(event_file)
@@ -604,12 +611,15 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                 else:
                     fireEvents.append( event ) 
                 ii += 1
-            
-            if ii > 0:  
-                fireEvent.Event._id_counter = last_id_fire_event + 1
-            else: 
-                pdb.set_trace()
-            
+          
+            if len(fireEvents) < fireEvent.Event._id_counter -1 :
+                while len(fireEvents) < fireEvent.Event._id_counter -1:
+                    fireEvents.append(None)
+
+            #fireEvent.Event._id_counter = last_id_fire_event + 1
+           
+            #if fireEvent.Event._id_counter != event.id_fire_event + 1: pdb.set_trace()
+
             shutil.rmtree(local_dir)
 
             # Set your directory and threshold date
@@ -951,7 +961,7 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
                         alpha_shapes.append(res)
             except Exception as err:
                 print(f" alpha-shape fallback [{type(err).__name__}] ", end='|')
-
+                
             # If pool run failed, finish missing events serially.
             done_ids = {item["cluster_fire_event"] for item in alpha_shapes}
             for item in event_items:
@@ -1083,6 +1093,8 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
 
                     if len(active_pp_matching_cluster)==1:
                         idx_event = active_pp_matching_cluster.index[0]
+                        if  fireEvents[idx_event] is None : 
+                            pdb.set_trace()
                         fireEvents[idx_event].add(cluster,ctr,fireCluster.crs,hsgdf_all_raw)
                         gdf_activeEvent = create_gdf_fireEvents(params,fireEvents)
                         #flag_found_matchingEvent = True
@@ -1320,6 +1332,13 @@ def perimeter_tracking(params, start_datetime, maskHS_gdf, dt_minutes):
     df.to_csv(f'{params["event"]["dir_hs_log"]}/HS-{start_datetime.strftime("%Y-%m-%d_%H%M")}.csv')
     if hsgdf_fix_all_raw is not None:
         gdf_to_gpkgfile(hsgdf_fix_all_raw, params, start_datetime, 'fix_hotspots')
+
+    
+    file_id_fire_event = params['event']['dir_data']+'/Pickles_{:s}_{:s}/id_fire_event.txt'.format('active', start_datetime.strftime("%Y-%m-%d_%H%M"))
+    if os.path.isdir(os.path.dirname(file_id_fire_event)):
+        with open(file_id_fire_event, "w") as f:
+            f.write(str(fireEvent.Event._id_counter))
+    
 
     return start_datetime, fireEvents, pastFireEvents
 

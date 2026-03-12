@@ -40,6 +40,7 @@ import json
 import socket
 import matplotlib.dates as mdates
 import pickle
+from collections import defaultdict
 
 warnings.filterwarnings("error", category=pd.errors.SettingWithCopyWarning)
 
@@ -112,7 +113,10 @@ def plot(params, year, week, fireEvents, pastFireEvents, flag_plot_hs=True, flag
             #    if len(event.times) == 1: continue
      
             if row_ctr.geometry.geom_type != 'Polygon':
-                gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, color='r', alpha=0.9, linewidth=0.1, zorder=1, markersize=1)
+                try: 
+                    gpd.GeoDataFrame(geometry=[row_ctr.geometry], crs=params['general']['crs']).to_crs(4326).plot(ax=ax, color='r', alpha=0.9, linewidth=0.1, zorder=1, markersize=1)
+                except: 
+                    pdb.set_trace()
             else: 
                 gpd.GeoSeries([row_ctr.geometry]).set_crs(params['general']['crs']).to_crs(4326).plot(ax=ax, facecolor='none',edgecolor='r', alpha=0.9, linewidth=0.1 , zorder=1, markersize=1)
 
@@ -303,6 +307,10 @@ def run_fire_stats(args):
     #            fire_merged[id_]=event.id_fire_event
     #print('done               ')
 
+
+    file_postcode = params['general']['root_data']+'/'+params['event']['osm_bndf']
+    gdf_postcode  = gpd.read_file(file_postcode).to_crs(params['general']['crs'])
+
     list_pb_in_merged_fire = []
     
     gdfs = []
@@ -310,6 +318,7 @@ def run_fire_stats(args):
     data_per_week = []
     data_per_week_all = []
     #gdf_events_all = None
+    fire_event_id_counted = []
     for (year, week,), df_week in grouped:
         print(f"Processing YEAR={year}, WEEK={week}, N={len(df_week)}")
 
@@ -394,13 +403,118 @@ def run_fire_stats(args):
         
         for event,event_file in zip(weekEvents,weekEvents_files):
             
-            frp_ = np.array(event.frps)              # MW
-            t_ = pd.to_datetime(event.times)
-            t_sec = (t_ - t_[0]).total_seconds().values
-            fre_ = np.trapezoid(frp_, t_sec)
+            if len(event.time_merging) != 0: continue
+
+            fre_ = 0 
+            frp_ = []
+            frp_time_ = []
+            frp_geo_ = []
             
-            t_ = pd.to_datetime(event.times)
-         
+            for id_ in np.unique(event.ctrs.id_fire_event): # sum fre per fire present in the event.
+                
+                if id_ in fire_event_id_counted: continue
+                fire_event_id_counted.append(id_) 
+                
+                frp_time_.append([])
+                frp_geo_.append([])
+                frp_.append([])
+
+                idx = np.where(event.ctrs.id_fire_event == id_ ) 
+                for frp__ in np.array(event.frps)[idx]: frp_[-1].append(frp__) 
+
+                t0_ = pd.to_datetime(event.times)[idx][0]
+                t_ = pd.to_datetime(event.times)[idx] + pd.Timedelta(minutes=10) # time at the end of the time step.
+                t_sec = (t_ - t0_).total_seconds().values 
+                for frp_time__ in (pd.to_datetime(event.times)[idx] + pd.Timedelta(minutes=5)):  # time at center
+                    frp_time_[-1].append(frp_time__) 
+               
+                for xx in event.ctrs.geometry.iloc[idx]:
+                    frp_geo_[-1].append(xx) 
+
+          
+            nbre_subEvent = len(frp_time_)
+
+            # merge per time
+            merged_frp = defaultdict(float)
+            merged_geo = defaultdict(list)
+
+            try:
+                for isub in range(nbre_subEvent):
+                    for t, frp, geo in zip(frp_time_[isub], frp_[isub], frp_geo_[isub]):
+                        #print(t, frp, geo)
+                        time_tag = t.strftime("%Y-%m-%d %H:%M:%S")
+                        merged_frp[time_tag] += float(frp)
+                        if time_tag in merged_geo.keys():
+                            merged_geo[time_tag].append(geo)
+                        else: 
+                            merged_geo[time_tag] = [geo]
+
+            except: 
+                pdb.set_trace()
+            #print( ' MM', len(merged_frp), len(merged_geo))
+            if len(merged_frp) != len(merged_geo): pdb.set_trace()
+
+
+            frp__      = list(merged_frp.values())
+            frp_time__ = [ datetime.strptime(xx, "%Y-%m-%d %H:%M:%S") for xx in merged_frp.keys() ]
+            frp_geo__ = []
+            for time_tag in merged_geo.keys():
+                if len(merged_geo[time_tag]) == 1:
+                    frp_geo__.append( merged_geo[time_tag][0] )
+                else:
+                    frp_geo__.append( unary_union(merged_geo[time_tag] ) ) 
+               
+            #if nbre_subEvent > 1 : pdb.set_trace()
+            
+            #compute FRE
+            dt = 10 * 60  # seconds
+            fre_ = np.array(frp__).sum() * dt
+
+            '''for 
+                frp__ =
+                if len(frp__)==1: 
+                    fre__ = (frp__*t_sec)[0]
+                else: 
+                    fre__ += np.trapezoid(frp__, t_sec)
+                if fre__ == 0 : pdb.set_trace()
+                
+                fre_+= fre__
+            '''
+            
+            try: 
+                t_ = pd.to_datetime(frp_time__)
+            except:
+                pdb.set_trace()
+            
+            '''
+            series_list = []
+            for frp_vals, time_vals in zip(frp_, frp_time_):
+                s = pd.Series(frp_vals, index=pd.DatetimeIndex(time_vals))
+                
+                # Ensure UTC consistency if needed
+                if s.index.tz is None:
+                    s.index = s.index.tz_localize("UTC")
+                else:
+                    s.index = s.index.tz_convert("UTC")
+                    
+                # Aggregate duplicates if they exist
+                s = s.groupby(s.index).sum()
+                
+                series_list.append(s)
+            '''
+
+            ## Concatenate all series
+            #try:
+            #    df_all = pd.concat(series_list, axis=1)
+            #except: 
+            #    pdb.set_trace()
+            ## Reindex to target time axis t_
+            #df_all = df_all.reindex(t_, fill_value=0)
+
+            ##Domain-integrated FRP time series
+            #frp_total = df_all.sum(axis=1)
+            
+
             time_merge = event.time_merging[0] if (len(event.time_merging)==1) else None
             
             if len(event.time_include) == 0: 
@@ -408,37 +522,49 @@ def run_fire_stats(args):
             else:
                 times_include = ';'.join( [xx.strftime("%Y-%m-%d_%H:%M:%S") for xx in event.time_include] )
 
-            gdf_ = gpd.GeoDataFrame(
-                    {
-                        "center_igni":event.centers[0], 
-                        "time_start": t_.floor("30 min")[0],
-                        "time_end": t_.floor("30 min")[-1],
-                        "time_merged": time_merge,
-                        "fre": fre_,
-                        "fire_event_id": event.id_fire_event,
-                        "fire_name": event.fire_name,
-                        "file": event_file,
-                        "dad_event": ';'.join(map(str, event.id_fire_event_dad)),
-                        "son_event": ';'.join(map(str, event.id_fire_event_son)),
-                        "time_include": times_include,
-                    },
-                    geometry=[event.ctrs['geometry'].iloc[-1]],
-                    crs=event.ctrs.crs, 
-                    index=[0],
-                )
+            #to correct fire_name 
+            fire_name_corrected = fireEvent.assign_single_fire_name(event, gdf_postcode )
+
+            try:
+                gdf_ = gpd.GeoDataFrame(
+                        {
+                            "center_igni":event.centers[0], 
+                            "time_start": t_.floor("30 min")[0],
+                            "time_end": t_.floor("30 min")[-1],
+                            "time_merged": time_merge,
+                            "fre": fre_,
+                            "fire_event_id": event.id_fire_event,
+                            "fire_name": fire_name_corrected,
+                            "file": event_file,
+                            "dad_event": ';'.join(map(str, event.id_fire_event_dad)),
+                            "son_event": ';'.join(map(str, event.id_fire_event_son)),
+                            "time_include": times_include,
+                        },
+                        geometry=[event.ctrs['geometry'].iloc[-1]],
+                        crs=event.ctrs.crs, 
+                        index=[0],
+                    )
+            except: 
+                pdb.set_trace() 
+
             #save indiviual geojson per event
             #event = fireEvent.load_fireEvent(event_file)
-            gdf__ = gpd.GeoDataFrame(
+            try:
+                gdf__ = gpd.GeoDataFrame(
                                         {
                                             "time": t_, 
                                             "time_floor": t_.floor("30 min"), 
-                                            "frp": frp_, 
-                                            "geometry": event.ctrs.geometry.values,
+                                            "frp": frp__, 
+                                            "geometry": frp_geo__, #event.ctrs.geometry.values,
                                         },
                                         crs=event.ctrs.crs,   # preserve original CRS
                                    )
+            except: 
+                pdb.set_trace()
             filename_fire_feature = f"{params['event']['dir_data']}/Stats/GeoJson/gdf_{event.id_fire_event}.geojson"
             gdf__.to_file(filename_fire_feature, driver="GeoJSON")
+
+            
 
             gdfs.append(gdf_)
 

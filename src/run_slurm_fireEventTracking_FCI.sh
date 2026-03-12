@@ -2,7 +2,7 @@
 #
 #   #SBATCH --account=paugam
 #SBATCH --job-name=FET # updated below in the next submission
-#SBATCH --ntasks=22
+#SBATCH --ntasks=40
 #SBATCH --cpus-per-task=1
 #SBATCH -p prod
 #SBATCH --mem 30G
